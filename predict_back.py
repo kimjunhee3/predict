@@ -1,9 +1,11 @@
 # predict_back.py
-import os, logging
-from flask import Flask, render_template, request
+import os, logging, json
+from flask import Flask, render_template, request, abort, jsonify
 from bs4 import BeautifulSoup
+from pathlib import Path
+from datetime import datetime
 
-# 배포에서 기본 ON
+# 배포에서 기본 ON (Railway에서 ENABLE_STATIZ=0이면 Statiz 비활성화)
 ENABLE_STATIZ = os.getenv("ENABLE_STATIZ", "1") == "1"
 if ENABLE_STATIZ:
     from statiz_predict import fetch_all_predictions_fast
@@ -22,8 +24,11 @@ team_colors = {
 def parse_naver_vote(team_name, file_path="fanvote.html"):
     if not os.path.exists(file_path):
         return None
+    # 파일을 텍스트로 읽어서 파싱
     with open(file_path, "r", encoding="utf-8") as f:
-        soup = BeautifulSoup(f, "html.parser")
+        html = f.read()
+    soup = BeautifulSoup(html, "html.parser")
+
     boxes = soup.select("div.MatchBox_match_box__IW-0f")
     for box in boxes:
         teams_ = box.select("div.MatchBox_name__m2MCa")
@@ -39,6 +44,35 @@ def parse_naver_vote(team_name, file_path="fanvote.html"):
 @app.route("/health")
 def health():
     return "ok", 200
+
+@app.route("/debug")
+def debug():
+    # 안전장치: 환경변수 켜진 경우에만 노출
+    if os.getenv("APP_DEBUG") != "1":
+        abort(404)
+
+    info = {}
+
+    # fanvote.html 상태
+    fanvote_path = Path("fanvote.html")
+    info["fanvote_exists"] = fanvote_path.exists()
+    if fanvote_path.exists():
+        stat = fanvote_path.stat()
+        info["fanvote_size"] = stat.st_size
+        info["fanvote_mtime"] = datetime.fromtimestamp(stat.st_mtime).isoformat()
+
+    # statiz 캐시 상태
+    cache_path = Path("statiz_cache.json")
+    info["statiz_cache_exists"] = cache_path.exists()
+    if cache_path.exists():
+        try:
+            with cache_path.open(encoding="utf-8") as f:
+                data = json.load(f)
+            info["statiz_cache_keys"] = list(data.keys())[:5]
+        except Exception as e:
+            info["statiz_cache_error"] = str(e)
+
+    return jsonify(info), 200   # ← 반드시 반환!
 
 @app.route("/", methods=["GET","POST"])
 def index():
