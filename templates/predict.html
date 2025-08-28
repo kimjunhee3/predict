@@ -1,9 +1,9 @@
-<!-- templates/predict.html -->
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>구단별 승부예측 비교</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     body { font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
            background:#ffffff; color:#2c3e50; margin:0; min-height:100vh; overflow:hidden; line-height:1.6; }
@@ -26,10 +26,12 @@
     .bar-link { display:block; height:40px; text-decoration:none; }
     .bar-link:hover .bar-left, .bar-link:hover .bar-right { opacity:0.9; }
     .predict-text { margin-top:16px; margin-bottom:0; font-size:0.9rem; color:#2c3e50; background:#f1f3f4; border-radius:18px; padding:12px 16px; line-height:1.5; max-width:500px; }
+    .empty { color:#7f8c8d; text-align:center; margin-top:40px; padding:20px; background:#f8f9fa; border-radius:8px; border:1px solid #e8ecef; }
   </style>
 </head>
 <body>
   <div class="container">
+    <!-- (옵션) 팀 셀렉터가 필요하면 form 표시 -->
     <form action="/" method="POST">
       <select name="team" onchange="this.form.submit()">
         {% for team in teams %}
@@ -39,61 +41,84 @@
     </form>
 
     {% if selected_team and statiz and naver %}
-    <div class="match-card">
-      <div class="teams-vs">
-        <div class="team-box">
-          <img class="team-img" src="/static/player/{{ selected_team == statiz.left_team and player_img_map[statiz.left_team]['야수'] or player_img_map[statiz.left_team]['야수'] }}">
-          <div class="team-label">{{ statiz.left_team }}</div>
-        </div>
-        <div class="vs">VS</div>
-        <div class="team-box">
-          <img class="team-img" src="/static/player/{{ player_img_map[statiz.right_team]['투수'] }}">
-          <div class="team-label">{{ statiz.right_team }}</div>
-        </div>
-      </div>
-
-      <div class="bar-chart">
-        <div class="bar-row">
-          <div class="bar-label statiz">STATIZ</div>
-          <div class="bar-dynamic">
-            <a class="bar-link" href="https://statiz.sporki.com/prediction/" target="_blank" style="width: {{ statiz.left_percent }}%;">
-              <div class="bar-left" style="width:100%; background-color:{% if statiz.left_percent > statiz.right_percent %}{{ team_colors[statiz.left_team] }}{% else %}#fff{% endif %}; color:{% if statiz.left_percent > statiz.right_percent %}#fff{% else %}#23283a{% endif %};">
-                {{ statiz.left_percent_str }}
-              </div>
-            </a>
-            <a class="bar-link" href="https://statiz.sporki.com/prediction/" target="_blank" style="width: {{ statiz.right_percent }}%;">
-              <div class="bar-right" style="width:100%; background-color:{% if statiz.right_percent > statiz.left_percent %}{{ team_colors[statiz.right_team] }}{% else %}#fff{% endif %}; color:{% if statiz.right_percent > statiz.left_percent %}#fff{% else %}#23283a{% endif %};">
-                {{ statiz.right_percent_str }}
-              </div>
-            </a>
+      <div class="match-card">
+        <div class="teams-vs">
+          <div class="team-box">
+            <img
+              class="team-img"
+              src="/static/player/{{ (player_img_map.get(statiz.left_team, {}).get('야수') or 'placeholder.png') }}"
+              alt="{{ statiz.left_team }}"
+            />
+            <div class="team-label">{{ statiz.left_team }}</div>
+          </div>
+          <div class="vs">VS</div>
+          <div class="team-box">
+            <img
+              class="team-img"
+              src="/static/player/{{ (player_img_map.get(statiz.right_team, {}).get('투수') or 'placeholder.png') }}"
+              alt="{{ statiz.right_team }}"
+            />
+            <div class="team-label">{{ statiz.right_team }}</div>
           </div>
         </div>
 
-        <div class="bar-row">
-          <div class="bar-label naver">NAVER</div>
-          <div class="bar-dynamic">
-            <a class="bar-link" href="https://m.sports.naver.com/predict?tab=today&groupId=kbaseball&categoryId=kbo" target="_blank" style="width: {{ naver.percent1 }}%;">
-              <div class="bar-left" style="width:100%; background-color:{% if naver.percent1 > naver.percent2 %}{{ team_colors[statiz.left_team] }}{% else %}#fff{% endif %}; color:{% if naver.percent1 > naver.percent2 %}#fff{% else %}#23283a{% endif %};">
-                {{ naver.percent1_str }}
-              </div>
-            </a>
-            <a class="bar-link" href="https://m.sports.naver.com/predict?tab=today&groupId=kbaseball&categoryId=kbo" target="_blank" style="width: {{ naver.percent2 }}%;">
-              <div class="bar-right" style="width:100%; background-color:{% if naver.percent2 > naver.percent1 %}{{ team_colors[statiz.right_team] }}{% else %}#fff{% endif %}; color:{% if naver.percent2 > naver.percent1 %}#fff{% else %}#23283a{% endif %};">
-                {{ naver.percent2_str }}
-              </div>
-            </a>
+        <div class="bar-chart">
+          <!-- STATIZ -->
+          <div class="bar-row">
+            <div class="bar-label statiz">STATIZ</div>
+            <div class="bar-dynamic">
+              <a class="bar-link" href="https://statiz.sporki.com/prediction/" target="_blank" style="width: {{ statiz.left_percent }}%;">
+                <div class="bar-left"
+                     style="width:100%;
+                            background-color:{% if statiz.left_percent > statiz.right_percent %}{{ team_colors.get(statiz.left_team, '#ddd') }}{% else %}#fff{% endif %};
+                            color:{% if statiz.left_percent > statiz.right_percent %}#fff{% else %}#23283a{% endif %};">
+                  {{ statiz.left_percent_str }}
+                </div>
+              </a>
+              <a class="bar-link" href="https://statiz.sporki.com/prediction/" target="_blank" style="width: {{ statiz.right_percent }}%;">
+                <div class="bar-right"
+                     style="width:100%;
+                            background-color:{% if statiz.right_percent > statiz.left_percent %}{{ team_colors.get(statiz.right_team, '#ddd') }}{% else %}#fff{% endif %};
+                            color:{% if statiz.right_percent > statiz.left_percent %}#fff{% else %}#23283a{% endif %};">
+                  {{ statiz.right_percent_str }}
+                </div>
+              </a>
+            </div>
+          </div>
+
+          <!-- NAVER -->
+          <div class="bar-row">
+            <div class="bar-label naver">NAVER</div>
+            <div class="bar-dynamic">
+              <a class="bar-link" href="https://m.sports.naver.com/predict?tab=today&groupId=kbaseball&categoryId=kbo" target="_blank" style="width: {{ naver.percent1 }}%;">
+                <div class="bar-left"
+                     style="width:100%;
+                            background-color:{% if naver.percent1 > naver.percent2 %}{{ team_colors.get(statiz.left_team, '#ddd') }}{% else %}#fff{% endif %};
+                            color:{% if naver.percent1 > naver.percent2 %}#fff{% else %}#23283a{% endif %};">
+                  {{ naver.percent1_str }}
+                </div>
+              </a>
+              <a class="bar-link" href="https://m.sports.naver.com/predict?tab=today&groupId=kbaseball&categoryId=kbo" target="_blank" style="width: {{ naver.percent2 }}%;">
+                <div class="bar-right"
+                     style="width:100%;
+                            background-color:{% if naver.percent2 > naver.percent1 %}{{ team_colors.get(statiz.right_team, '#ddd') }}{% else %}#fff{% endif %};
+                            color:{% if naver.percent2 > naver.percent1 %}#fff{% else %}#23283a{% endif %};">
+                  {{ naver.percent2_str }}
+                </div>
+              </a>
+            </div>
           </div>
         </div>
+
+        {% if statiz.predict_text %}
+          <div class="predict-text">
+            📝 <b>예측 텍스트:</b> {{ statiz.predict_text }}
+          </div>
+        {% endif %}
       </div>
 
-      {% if statiz.predict_text %}
-      <div class="predict-text">
-        📝 <b>예측 텍스트:</b> {{ statiz.predict_text }}
-      </div>
-      {% endif %}
-    </div>
     {% elif selected_team %}
-      <div style="color:#7f8c8d; text-align:center; margin-top:40px; padding:20px; background:#f8f9fa; border-radius:8px; border:1px solid #e8ecef;">
+      <div class="empty">
         해당 구단의 예측 결과가 없습니다.
       </div>
     {% endif %}
