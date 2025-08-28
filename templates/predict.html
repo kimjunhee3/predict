@@ -1,86 +1,70 @@
 <!doctype html>
 <html lang="ko">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>승부예측 대시보드</title>
+  <meta charset="utf-8">
+  <title>승부예측 (Naver + Statiz)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Apple SD Gothic Neo,Noto Sans KR,sans-serif;margin:0;padding:24px;background:#fafafa;color:#222}
-    .wrap{max-width:960px;margin:0 auto}
-    h1{font-size:22px;margin:0 0 18px}
-    form{margin-bottom:18px}
-    select{padding:8px 10px;border:1px solid #ddd;border-radius:8px}
-    button{padding:8px 12px;border:1px solid #ccc;border-radius:8px;background:#fff;cursor:pointer}
-    .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-    .card{background:#fff;border:1px solid #eee;border-radius:12px;padding:16px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
-    .title{font-size:16px;font-weight:700;margin-bottom:10px}
-    .row{display:flex;justify-content:space-between;align-items:center;margin:8px 0}
-    .team{display:flex;align-items:center;gap:8px}
-    .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;border:1px solid #eee;background:#f7f7f7}
-    .muted{color:#888}
-    .empty{padding:18px;border:1px dashed #e2e2e2;border-radius:8px;background:#fbfbfb;color:#888;text-align:center}
-    .footer{margin-top:18px;font-size:12px;color:#888}
+    body{font-family:system-ui, -apple-system, Segoe UI, Roboto, sans-serif;margin:0;padding:24px;background:#fafafa;color:#222}
+    .wrap{max-width:980px;margin:0 auto}
+    h1{font-size:28px;margin:0 0 18px}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .card{background:#fff;border:1px solid #eee;border-radius:12px;padding:18px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+    .label{display:inline-block;padding:6px 10px;border-radius:999px;background:#f2f2f2;margin:8px 6px 14px 0;font-size:12px}
+    .bar{height:16px;border-radius:8px;background:#eee;position:relative;overflow:hidden}
+    .bar > span{position:absolute;left:0;top:0;bottom:0}
+    .muted{color:#888;font-size:12px;margin-top:14px}
+    .controls{display:flex;gap:8px;margin:10px 0 18px}
+    select,button{padding:8px 10px;border:1px solid #ddd;border-radius:8px;background:#fff}
+    button{cursor:pointer}
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <h1>승부예측 (Naver + Statiz)</h1>
+<div class="wrap">
+  <h1>승부예측 (Naver + Statiz)</h1>
 
-    <form method="post">
-      <label for="team">구단 선택:&nbsp;</label>
-      <select id="team" name="team">
+  <form method="post" class="controls">
+    <div>구단 선택:&nbsp;
+      <select name="team">
         {% for t in teams %}
           <option value="{{t}}" {% if t==selected_team %}selected{% endif %}>{{t}}</option>
         {% endfor %}
       </select>
-      <button type="submit">보기</button>
-      <span class="pill">현재: {{selected_team}}</span>
-    </form>
+    </div>
+    <button type="submit">보기</button>
+    <div class="label">현재: {{selected_team}}</div>
+  </form>
 
-    <div class="grid">
-      <div class="card">
-        <div class="title">네이버 팬투표</div>
-        {% if naver %}
-          <div class="row">
-            <div class="team">
-              <span class="pill" style="background:{{ team_colors.get(naver.team1, '#f1f1f1') }}20;border-color:#eee">{{naver.team1}}</span>
-            </div>
-            <strong>{{naver.percent1_str}}</strong>
-          </div>
-          <div class="row">
-            <div class="team">
-              <span class="pill" style="background:{{ team_colors.get(naver.team2, '#f1f1f1') }}20;border-color:#eee">{{naver.team2}}</span>
-            </div>
-            <strong>{{naver.percent2_str}}</strong>
-          </div>
-        {% else %}
-          <div class="empty">해당 구단의 팬투표 데이터가 없습니다. (fanvote.html 갱신 필요)</div>
-        {% endif %}
-      </div>
-
-      <div class="card">
-        <div class="title">Statiz 승부예측</div>
-        {% if statiz %}
-          <div class="row">
-            <div class="team"><span class="pill">{{statiz.left_team}}</span></div>
-            <strong>{{statiz.left_percent_str}}</strong>
-          </div>
-          <div class="row">
-            <div class="team"><span class="pill">{{statiz.right_team}}</span></div>
-            <strong>{{statiz.right_percent_str}}</strong>
-          </div>
-          {% if statiz.pitchers %}
-            <div class="muted">선발: {{statiz.pitchers}}</div>
-          {% endif %}
-        {% else %}
-          <div class="empty">해당 구단의 Statiz 예측 데이터가 없습니다. (statiz_cache.json 갱신/커밋 필요)</div>
-        {% endif %}
-      </div>
+  <div class="row">
+    <div class="card">
+      <h3>네이버 팬투표</h3>
+      {% if naver %}
+        <div class="label">{{naver.team1}}</div>
+        <div class="label">{{naver.team2}}</div>
+        <div class="bar" style="margin:6px 0 6px">
+          <span style="width: {{naver.percent1}}%; background: {{ team_colors.get(naver.team1, '#4a7') }}"></span>
+        </div>
+        <div>{{naver.team1}} {{naver.percent1_str}} / {{naver.team2}} {{naver.percent2_str}}</div>
+      {% else %}
+        <div class="muted">fanvote.html 파일을 갱신해야 합니다.</div>
+      {% endif %}
+      <div class="muted">서버는 브라우저 없이 동작합니다. <code>fanvote.html</code>과 <code>statiz_cache.json</code>만 업데이트하세요.</div>
     </div>
 
-    <div class="footer">
-      서버는 브라우저 없이 동작합니다. <code>fanvote.html</code>과 <code>statiz_cache.json</code>만 업데이트하세요.
+    <div class="card">
+      <h3>Statiz 승부예측</h3>
+      {% if statiz %}
+        <div class="label">{{statiz.left_team}}</div>
+        <div class="label">{{statiz.right_team}}</div>
+        <div class="bar" style="margin:6px 0 6px">
+          <span style="width: {{statiz.left_percent}}%; background: {{ team_colors.get(statiz.left_team, '#47a') }}"></span>
+        </div>
+        <div>{{statiz.left_team}} {{statiz.left_percent_str}} / {{statiz.right_team}} {{statiz.right_percent_str}}</div>
+      {% else %}
+        <div class="muted">해당 구단의 Statiz 예측 데이터가 없습니다.<br>(<code>statiz_cache.json</code> 갱신/커밋 필요)</div>
+      {% endif %}
     </div>
   </div>
+</div>
 </body>
 </html>
