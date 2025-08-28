@@ -1,0 +1,6 @@
+.git
+*.md
+__pycache__/
+*.pyc
+.env
+naver_cookies.json
