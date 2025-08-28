@@ -1,6 +1,35 @@
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Env & secrets
 .env
-statiz_cache.json
-fanvote_cache.json
+.env.*
+!.env.example
 naver_cookies.json
+statiz_cache.json
+
+# Logs & runtime
+*.log
+logs/
+tmp/
+.cache/
+selenium-screenshots/
+chromedriver.log
+
+# Packaging
+dist/
+build/
+*.egg-info/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# (있다면) Node
+node_modules/
