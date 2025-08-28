@@ -24,4 +24,4 @@ ENV WEB_CONCURRENCY=2
 ENV ENABLE_STATIZ=1
 
 # 6) 실행 (Gunicorn가 Railway의 $PORT를 바인딩)
-CMD sh -c 'gunicorn -w ${WEB_CONCURRENCY:-2} -k gthread -b 0.0.0.0:${PORT} predict_back.py:app'
+CMD sh -c 'gunicorn -w ${WEB_CONCURRENCY:-2} -k gthread -b 0.0.0.0:${PORT} predict_back:app'
