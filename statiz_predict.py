@@ -1,3 +1,10 @@
+# -*- coding: utf-8 -*-
+"""
+Statiz 승부예측 크롤러 + 파일 캐시
+- pred:<YYYY-MM-DD>:<s_no>  : 단일 경기 상세(팀/퍼센트/텍스트)
+- predlist:<YYYY-MM-DD>      : '완전한' 목록(팀2 + 퍼센트2 모두 있을 때만 저장)
+"""
+
 import json
 import os
 import re
@@ -5,18 +12,14 @@ import time
 from typing import List, Dict, Optional, Any
 from datetime import datetime, timedelta, timezone
 
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException
+# 셀레니움은 '필요할 때만' 로드되도록 import를 함수 안으로 미룸
+# (서버에서는 predlist 캐시만 있으면 여기까지 오지도 않음)
 
 BASE_URL = "https://statiz.sporki.com/prediction/"
-CACHE_PATH = "statiz_cache.json"          # 캐시 파일 경로
-DEFAULT_TTL_MIN = int(os.getenv("STATIZ_TTL_MIN", "30"))
+CACHE_PATH = "statiz_cache.json"
+DEFAULT_TTL_MIN = 30
 
-# ===================== 시간/캐시 유틸 =====================
+# -------------------- 시간/캐시 유틸 --------------------
 
 def _now_kst() -> datetime:
     return datetime.utcnow().replace(tzinfo=timezone.utc) + timedelta(hours=9)
@@ -46,38 +49,28 @@ def _is_fresh(item: Dict[str, Any], ttl_minutes: int) -> bool:
         return False
     return (_now_kst() - ts) < timedelta(minutes=ttl_minutes)
 
-def clear_cache():
-    if os.path.exists(CACHE_PATH):
-        os.remove(CACHE_PATH)
+# -------------------- 셀레니움 헬퍼 --------------------
 
-# ===================== Selenium 드라이버 =====================
+def _make_driver(headless: bool = True):
+    from selenium import webdriver
+    from selenium.webdriver.chrome.options import Options
 
-def _make_driver(headless: bool = True) -> webdriver.Chrome:
     opts = Options()
-    # Dockerfile에서 지정한 바이너리 경로 사용
-    chrome_bin = os.environ.get("CHROME_BIN")
-    if chrome_bin:
-        opts.binary_location = chrome_bin
-
     if headless:
-        # chromium 최신 headless
         opts.add_argument("--headless=new")
     opts.add_argument("--disable-gpu")
     opts.add_argument("--no-sandbox")
     opts.add_argument("--disable-dev-shm-usage")
     opts.add_argument("--window-size=1280,1600")
-    opts.add_argument("--disable-extensions")
-    opts.add_argument("--disable-software-rasterizer")
     opts.add_argument(
-        "user-agent=Mozilla/5.0 (X11; Linux x86_64) "
+        "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     )
-    # /usr/bin/chromedriver 가 PATH에 있으므로 별도 Service 지정 불필요
-    driver = webdriver.Chrome(options=opts)
+    driver = webdriver.Chrome(options=opts)   # Selenium Manager 사용
     driver.set_page_load_timeout(30)
     return driver
 
-# ===================== 파싱 유틸 =====================
+# -------------------- 파싱 유틸 --------------------
 
 def _clean_text(s: str) -> str:
     return re.sub(r"\s+", " ", s or "").strip()
@@ -90,14 +83,13 @@ def _percent_from_style(style: str) -> Optional[float]:
     m = re.search(r"width:\s*(\d+(?:\.\d+)?)\s*%", style or "")
     return float(m.group(1)) if m else None
 
-# ===================== s_no 수집(+캐시) =====================
+# -------------------- s_no 목록 --------------------
 
-def generate_s_no_list(
-    headless: bool = True,
-    use_cache: bool = True,
-    ttl_minutes: int = DEFAULT_TTL_MIN,
-    force_refresh: bool = False,
-) -> List[str]:
+def generate_s_no_list(headless=True, use_cache=True, ttl_minutes=DEFAULT_TTL_MIN, force_refresh=False) -> List[str]:
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.support.ui import WebDriverWait
+    from selenium.webdriver.support import expected_conditions as EC
+
     cache = _load_cache()
     day_key = _today_kst_str()
     cache_key = f"s_nos:{day_key}"
@@ -113,10 +105,9 @@ def generate_s_no_list(
         WebDriverWait(driver, 20).until(
             EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div.swiper-slide.item"))
         )
-        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-        time.sleep(0.6)
-        driver.execute_script("window.scrollTo(0, 0);")
-        time.sleep(0.2)
+
+        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);"); time.sleep(0.6)
+        driver.execute_script("window.scrollTo(0, 0);"); time.sleep(0.2)
 
         slides = driver.find_elements(By.CSS_SELECTOR, "div.swiper-slide.item")
         s_nos = []
@@ -126,10 +117,10 @@ def generate_s_no_list(
                 m = re.search(r"s_no=(\d+)", onclick)
                 if m:
                     s_nos.append(m.group(1))
-            except NoSuchElementException:
+            except Exception:
                 pass
 
-        seen, uniq = set(), []
+        uniq, seen = [], set()
         for s in s_nos:
             if s not in seen:
                 seen.add(s); uniq.append(s)
@@ -142,9 +133,14 @@ def generate_s_no_list(
     finally:
         driver.quit()
 
-# ===================== 단일 경기 파싱(상세) =====================
+# -------------------- 단일 경기 상세 --------------------
 
 def _parse_single_prediction(driver, s_no: str) -> Dict:
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.support.ui import WebDriverWait
+    from selenium.webdriver.support import expected_conditions as EC
+    from selenium.common.exceptions import TimeoutException
+
     url = f"{BASE_URL}?s_no={s_no}"
     driver.get(url)
     try:
@@ -158,33 +154,26 @@ def _parse_single_prediction(driver, s_no: str) -> Dict:
     try:
         left = driver.find_element(By.CSS_SELECTOR, ".team_name .left.team_item")
         right = driver.find_element(By.CSS_SELECTOR, ".team_name .right.team_item")
-        left_team_txt = _clean_text(left.get_attribute("innerText"))
-        right_team_txt = _clean_text(right.get_attribute("innerText"))
-        left_team = left_team_txt.split()[-1] if left_team_txt else None
-        right_team = right_team_txt.split()[0] if right_team_txt else None
-    except NoSuchElementException:
+        lt = _clean_text(left.get_attribute("innerText"))
+        rt = _clean_text(right.get_attribute("innerText"))
+        left_team = lt.split()[-1] if lt else None
+        right_team = rt.split()[0] if rt else None
+    except Exception:
         pass
 
     left_percent = right_percent = None
     try:
-        left_item = driver.find_element(By.CSS_SELECTOR, ".predict .p_item.left")
-        right_item = driver.find_element(By.CSS_SELECTOR, ".predict .p_item.right")
-
-        left_percent = _extract_percent(_clean_text(left_item.text))
-        right_percent = _extract_percent(_clean_text(right_item.text))
-        if left_percent is None:
-            left_percent = _percent_from_style(left_item.get_attribute("style"))
-        if right_percent is None:
-            right_percent = _percent_from_style(right_item.get_attribute("style"))
-    except NoSuchElementException:
+        litem = driver.find_element(By.CSS_SELECTOR, ".predict .p_item.left")
+        ritem = driver.find_element(By.CSS_SELECTOR, ".predict .p_item.right")
+        left_percent  = _extract_percent(_clean_text(litem.text))  or _percent_from_style(litem.get_attribute("style"))
+        right_percent = _extract_percent(_clean_text(ritem.text))  or _percent_from_style(ritem.get_attribute("style"))
+    except Exception:
         pass
 
     predict_text = None
     try:
-        predict_text = _clean_text(
-            driver.find_element(By.CSS_SELECTOR, "div.predict_text").get_attribute("innerText")
-        )
-    except NoSuchElementException:
+        predict_text = _clean_text(driver.find_element(By.CSS_SELECTOR, "div.predict_text").get_attribute("innerText"))
+    except Exception:
         predict_text = None
 
     return {
@@ -197,22 +186,23 @@ def _parse_single_prediction(driver, s_no: str) -> Dict:
         "predict_text": predict_text,
     }
 
-# ===================== 목록 페이지에서 긁기 =====================
+# -------------------- 목록 페이지 (predlist는 완전할 때만 저장) --------------------
 
-def scrape_list_page_predictions(
-    headless: bool = True,
-    use_cache: bool = True,
-    ttl_minutes: int = DEFAULT_TTL_MIN,
-    force_refresh: bool = False,
-) -> List[Dict]:
+def scrape_list_page_predictions(headless=True, use_cache=True, ttl_minutes=DEFAULT_TTL_MIN, force_refresh=False) -> List[Dict]:
     cache = _load_cache()
     day_key = _today_kst_str()
     cache_key = f"predlist:{day_key}"
 
+    # 캐시가 있으면 바로 반환(서버에서는 여기서 끝 → 셀레니움 안 씀)
     if use_cache and not force_refresh:
         item = cache.get(cache_key)
         if item and _is_fresh(item, ttl_minutes):
             return list(item["data"])
+
+    # 여기부터는 실제 크롤링
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.support.ui import WebDriverWait
+    from selenium.webdriver.support import expected_conditions as EC
 
     driver = _make_driver(headless=headless)
     rows: List[Dict] = []
@@ -222,10 +212,8 @@ def scrape_list_page_predictions(
             EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div.swiper-slide.item"))
         )
 
-        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-        time.sleep(0.6)
-        driver.execute_script("window.scrollTo(0, 0);")
-        time.sleep(0.2)
+        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);"); time.sleep(0.6)
+        driver.execute_script("window.scrollTo(0, 0);"); time.sleep(0.2)
 
         slides = driver.find_elements(By.CSS_SELECTOR, "div.swiper-slide.item")
         for sl in slides:
@@ -235,31 +223,26 @@ def scrape_list_page_predictions(
                 m = re.search(r"s_no=(\d+)", onclick)
                 if m:
                     s_no = m.group(1)
-            except NoSuchElementException:
+            except Exception:
                 pass
 
             left_team = right_team = None
+            left_percent = right_percent = None
             try:
                 left = sl.find_element(By.CSS_SELECTOR, ".team_name .left.team_item")
                 right = sl.find_element(By.CSS_SELECTOR, ".team_name .right.team_item")
                 lt = _clean_text(left.get_attribute("innerText"))
                 rt = _clean_text(right.get_attribute("innerText"))
-                left_team = lt.split()[-1] if lt else None
+                left_team  = lt.split()[-1] if lt else None
                 right_team = rt.split()[0] if rt else None
-            except NoSuchElementException:
+            except Exception:
                 pass
-
-            left_percent = right_percent = None
             try:
                 litem = sl.find_element(By.CSS_SELECTOR, ".predict .p_item.left")
                 ritem = sl.find_element(By.CSS_SELECTOR, ".predict .p_item.right")
-                left_percent = _extract_percent(_clean_text(litem.text))
-                right_percent = _extract_percent(_clean_text(ritem.text))
-                if left_percent is None:
-                    left_percent = _percent_from_style(litem.get_attribute("style"))
-                if right_percent is None:
-                    right_percent = _percent_from_style(ritem.get_attribute("style"))
-            except NoSuchElementException:
+                left_percent  = _extract_percent(_clean_text(litem.text))  or _percent_from_style(litem.get_attribute("style"))
+                right_percent = _extract_percent(_clean_text(ritem.text))  or _percent_from_style(ritem.get_attribute("style"))
+            except Exception:
                 pass
 
             if s_no:
@@ -273,44 +256,43 @@ def scrape_list_page_predictions(
                     "predict_text": None,
                 })
 
-        uniq_rows, seen = [], set()
+        # 중복 제거
+        uniq, seen = [], set()
         for r in rows:
-            key = r["s_no"]
-            if key in seen: 
+            if r["s_no"] in seen:
                 continue
-            seen.add(key)
-            uniq_rows.append(r)
+            seen.add(r["s_no"]); uniq.append(r)
 
-        if use_cache:
-            cache[cache_key] = {"ts": _now_kst().isoformat(timespec="seconds"), "data": uniq_rows}
+        # ✅ 팀/퍼센트 모두 있는 '완전한' 경우에만 predlist 저장
+        complete = [
+            r for r in uniq
+            if r.get("left_team") and r.get("right_team")
+            and r.get("left_percent") is not None and r.get("right_percent") is not None
+        ]
+        if use_cache and complete and len(complete) == len(uniq):
+            cache[cache_key] = {"ts": _now_kst().isoformat(timespec="seconds"), "data": complete}
             _save_cache(cache)
 
-        return uniq_rows
+        return uniq
     finally:
         driver.quit()
 
-# ===================== 상세 보완 + 캐시 저장 =====================
+# -------------------- 상세 보완 + 최종 predlist 기록 --------------------
 
-def fetch_predictions(
-    s_no_list: List[str],
-    headless: bool = True,
-    use_cache: bool = True,
-    ttl_minutes: int = DEFAULT_TTL_MIN,
-    force_refresh: bool = False,
-) -> List[Dict]:
+def fetch_predictions(s_no_list: List[str], headless=True, use_cache=True, ttl_minutes=DEFAULT_TTL_MIN, force_refresh=False) -> List[Dict]:
     if not s_no_list:
         return []
 
     cache = _load_cache()
     day_key = _today_kst_str()
 
-    cached_data: Dict[str, Dict] = {}
+    cached: Dict[str, Dict] = {}
     misses: List[str] = []
     for s_no in s_no_list:
-        cache_key = f"pred:{day_key}:{s_no}"
-        item = cache.get(cache_key)
+        key = f"pred:{day_key}:{s_no}"
+        item = cache.get(key)
         if use_cache and (not force_refresh) and item and _is_fresh(item, ttl_minutes):
-            cached_data[s_no] = item["data"]
+            cached[s_no] = item["data"]
         else:
             misses.append(s_no)
 
@@ -326,64 +308,55 @@ def fetch_predictions(
                         except Exception:
                             data[k] = None
                 if use_cache:
-                    cache_key = f"pred:{day_key}:{s_no}"
-                    cache[cache_key] = {
-                        "ts": _now_kst().isoformat(timespec="seconds"),
-                        "data": data,
-                    }
-                cached_data[s_no] = data
+                    cache[f"pred:{day_key}:{s_no}"] = {"ts": _now_kst().isoformat(timespec="seconds"), "data": data}
+                cached[s_no] = data
                 time.sleep(0.3)
         finally:
             _save_cache(cache)
             driver.quit()
 
-    return [cached_data[s_no] for s_no in s_no_list if s_no in cached_data]
+    return [cached[s_no] for s_no in s_no_list if s_no in cached]
 
-# ===================== 하이브리드: 목록 긁고 누락 상세 보완 =====================
-
-def fetch_all_predictions_fast(
-    headless: bool = True,
-    use_cache: bool = True,
-    ttl_minutes: int = DEFAULT_TTL_MIN,
-    force_refresh: bool = False,
-    fill_detail: bool = True,
-) -> List[Dict]:
+def fetch_all_predictions_fast(headless=True, use_cache=True, ttl_minutes=DEFAULT_TTL_MIN, force_refresh=False, fill_detail=True) -> List[Dict]:
     rows = scrape_list_page_predictions(
-        headless=headless,
-        use_cache=use_cache,
-        ttl_minutes=ttl_minutes,
-        force_refresh=force_refresh,
+        headless=headless, use_cache=use_cache, ttl_minutes=ttl_minutes, force_refresh=force_refresh
     )
 
     if not fill_detail:
         return rows
 
-    need_snos: List[str] = []
+    need = []
     for r in rows:
-        if r.get("left_percent") is None or r.get("right_percent") is None \
-           or r.get("left_team") is None or r.get("right_team") is None \
-           or r.get("predict_text") is None:
-            need_snos.append(r["s_no"])
+        if (r.get("left_percent") is None or r.get("right_percent") is None
+            or r.get("left_team") is None or r.get("right_team") is None
+            or r.get("predict_text") is None):
+            need.append(r["s_no"])
 
-    if not need_snos:
-        return rows
+    detailed = {}
+    if need:
+        detailed = {d["s_no"]: d for d in fetch_predictions(
+            need, headless=headless, use_cache=use_cache, ttl_minutes=ttl_minutes, force_refresh=force_refresh
+        )}
 
-    detailed = {d["s_no"]: d for d in fetch_predictions(
-        need_snos,
-        headless=headless,
-        use_cache=use_cache,
-        ttl_minutes=ttl_minutes,
-        force_refresh=force_refresh,
-    )}
-
-    merged: List[Dict] = []
+    merged = []
     for base in rows:
         dn = detailed.get(base["s_no"])
-        if not dn:
-            merged.append(base); continue
         out = dict(base)
-        for k in ("left_team", "right_team", "left_percent", "right_percent", "predict_text"):
-            if out.get(k) is None and dn.get(k) is not None:
-                out[k] = dn[k]
+        if dn:
+            for k in ("left_team", "right_team", "left_percent", "right_percent", "predict_text"):
+                if out.get(k) is None and dn.get(k) is not None:
+                    out[k] = dn[k]
         merged.append(out)
+
+    # 최종 병합본이 '완전'하면 predlist 저장(텍스트는 없어도 OK)
+    complete = [
+        r for r in merged
+        if r.get("left_team") and r.get("right_team")
+        and r.get("left_percent") is not None and r.get("right_percent") is not None
+    ]
+    if use_cache and complete and len(complete) == len(merged):
+        cache = _load_cache()
+        cache[f"predlist:{_today_kst_str()}"] = {"ts": _now_kst().isoformat(timespec="seconds"), "data": complete}
+        _save_cache(cache)
+
     return merged
