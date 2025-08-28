@@ -1,123 +1,86 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <title>구단별 승부예측 비교</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>승부예측 대시보드</title>
   <style>
-    body { font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-           background:#ffffff; color:#2c3e50; margin:0; min-height:100vh; overflow:hidden; line-height:1.6; }
-    .container { max-width:700px; margin:0; padding:20px; background:#ffffff; border-radius:16px; height:570px; overflow:hidden; }
-    h1 { font-size:1.6rem; font-weight:600; color:#34495e; margin-bottom:14px; text-align:center; letter-spacing:-0.5px; }
-    form { display:block; text-align:center; margin-bottom:14px; }
-    select { padding:8px 12px; border:1px solid #e0e0e0; border-radius:8px; }
-    .match-card { background:#f8f9fa; border-radius:18px; padding:20px; margin:0 0 20px 0; max-width:600px; }
-    .teams-vs { display:flex; justify-content:space-between; align-items:stretch; gap:20px; background:#ffffff; padding:16px; border-radius:16px; }
-    .team-box { display:flex; flex-direction:column; align-items:center; width:45%; }
-    .team-img { width:100%; height:240px; object-fit:contain; object-position:center; border-radius:8px; background:#ffffff; padding:30px; box-sizing:border-box; }
-    .team-label { margin-top:12px; font-size:1.1rem; font-weight:600; color:#34495e; }
-    .vs { font-size:1.8rem; font-weight:700; color:#7f8c8d; align-self:center; width:10%; text-align:center; }
-    .bar-chart { display:flex; flex-direction:column; margin-top:24px; gap:12px; }
-    .bar-row { display:flex; height:40px; font-weight:600; font-size:0.95rem; border-radius:20px; overflow:hidden; background:#ffffff; margin-bottom:8px; }
-    .bar-label { width:80px; text-align:center; line-height:40px; background:#f8f9fa; color:#34495e; border-radius:20px 0 0 20px; }
-    .bar-label.statiz { background:#fce4ec; color:#ad1457; }
-    .bar-label.naver  { background:#e3f2fd; color:#1565c0; }
-    .bar-dynamic { display:flex; flex-grow:1; }
-    .bar-left, .bar-right { text-align:center; line-height:40px; font-weight:600; transition:all 0.2s ease; }
-    .bar-link { display:block; height:40px; text-decoration:none; }
-    .bar-link:hover .bar-left, .bar-link:hover .bar-right { opacity:0.9; }
-    .predict-text { margin-top:16px; margin-bottom:0; font-size:0.9rem; color:#2c3e50; background:#f1f3f4; border-radius:18px; padding:12px 16px; line-height:1.5; max-width:500px; }
-    .empty { color:#7f8c8d; text-align:center; margin-top:40px; padding:20px; background:#f8f9fa; border-radius:8px; border:1px solid #e8ecef; }
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Apple SD Gothic Neo,Noto Sans KR,sans-serif;margin:0;padding:24px;background:#fafafa;color:#222}
+    .wrap{max-width:960px;margin:0 auto}
+    h1{font-size:22px;margin:0 0 18px}
+    form{margin-bottom:18px}
+    select{padding:8px 10px;border:1px solid #ddd;border-radius:8px}
+    button{padding:8px 12px;border:1px solid #ccc;border-radius:8px;background:#fff;cursor:pointer}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .card{background:#fff;border:1px solid #eee;border-radius:12px;padding:16px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+    .title{font-size:16px;font-weight:700;margin-bottom:10px}
+    .row{display:flex;justify-content:space-between;align-items:center;margin:8px 0}
+    .team{display:flex;align-items:center;gap:8px}
+    .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;border:1px solid #eee;background:#f7f7f7}
+    .muted{color:#888}
+    .empty{padding:18px;border:1px dashed #e2e2e2;border-radius:8px;background:#fbfbfb;color:#888;text-align:center}
+    .footer{margin-top:18px;font-size:12px;color:#888}
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>구단별 승부예측 비교</h1>
+  <div class="wrap">
+    <h1>승부예측 (Naver + Statiz)</h1>
 
-    <form action="/" method="POST">
-      <select name="team" onchange="this.form.submit()">
-        {% for team in teams %}
-          <option value="{{ team }}" {% if selected_team == team %}selected{% endif %}>{{ team }}</option>
+    <form method="post">
+      <label for="team">구단 선택:&nbsp;</label>
+      <select id="team" name="team">
+        {% for t in teams %}
+          <option value="{{t}}" {% if t==selected_team %}selected{% endif %}>{{t}}</option>
         {% endfor %}
       </select>
+      <button type="submit">보기</button>
+      <span class="pill">현재: {{selected_team}}</span>
     </form>
 
-    {% if selected_team and statiz and naver %}
-      <div class="match-card">
-        <div class="teams-vs">
-          <div class="team-box">
-            <img class="team-img"
-                 src="/static/player/{{ (player_img_map.get(statiz.left_team, {}).get('야수') or 'placeholder.png') }}"
-                 alt="{{ statiz.left_team }}" />
-            <div class="team-label">{{ statiz.left_team }}</div>
-          </div>
-          <div class="vs">VS</div>
-          <div class="team-box">
-            <img class="team-img"
-                 src="/static/player/{{ (player_img_map.get(statiz.right_team, {}).get('투수') or 'placeholder.png') }}"
-                 alt="{{ statiz.right_team }}" />
-            <div class="team-label">{{ statiz.right_team }}</div>
-          </div>
-        </div>
-
-        <div class="bar-chart">
-          <div class="bar-row">
-            <div class="bar-label statiz">STATIZ</div>
-            <div class="bar-dynamic">
-              <a class="bar-link" href="https://statiz.sporki.com/prediction/" target="_blank" style="width: {{ statiz.left_percent }}%;">
-                <div class="bar-left"
-                     style="width:100%;
-                            background-color:{% if statiz.left_percent > statiz.right_percent %}{{ team_colors.get(statiz.left_team, '#ddd') }}{% else %}#fff{% endif %};
-                            color:{% if statiz.left_percent > statiz.right_percent %}#fff{% else %}#23283a{% endif %};">
-                  {{ statiz.left_percent_str }}
-                </div>
-              </a>
-              <a class="bar-link" href="https://statiz.sporki.com/prediction/" target="_blank" style="width: {{ statiz.right_percent }}%;">
-                <div class="bar-right"
-                     style="width:100%;
-                            background-color:{% if statiz.right_percent > statiz.left_percent %}{{ team_colors.get(statiz.right_team, '#ddd') }}{% else %}#fff{% endif %};
-                            color:{% if statiz.right_percent > statiz.left_percent %}#fff{% else %}#23283a{% endif %};">
-                  {{ statiz.right_percent_str }}
-                </div>
-              </a>
+    <div class="grid">
+      <div class="card">
+        <div class="title">네이버 팬투표</div>
+        {% if naver %}
+          <div class="row">
+            <div class="team">
+              <span class="pill" style="background:{{ team_colors.get(naver.team1, '#f1f1f1') }}20;border-color:#eee">{{naver.team1}}</span>
             </div>
+            <strong>{{naver.percent1_str}}</strong>
           </div>
-
-          <div class="bar-row">
-            <div class="bar-label naver">NAVER</div>
-            <div class="bar-dynamic">
-              <a class="bar-link" href="https://m.sports.naver.com/predict?tab=today&groupId=kbaseball&categoryId=kbo" target="_blank" style="width: {{ naver.percent1 }}%;">
-                <div class="bar-left"
-                     style="width:100%;
-                            background-color:{% if naver.percent1 > naver.percent2 %}{{ team_colors.get(statiz.left_team, '#ddd') }}{% else %}#fff{% endif %};
-                            color:{% if naver.percent1 > naver.percent2 %}#fff{% else %}#23283a{% endif %};">
-                  {{ naver.percent1_str }}
-                </div>
-              </a>
-              <a class="bar-link" href="https://m.sports.naver.com/predict?tab=today&groupId=kbaseball&categoryId=kbo" target="_blank" style="width: {{ naver.percent2 }}%;">
-                <div class="bar-right"
-                     style="width:100%;
-                            background-color:{% if naver.percent2 > naver.percent1 %}{{ team_colors.get(statiz.right_team, '#ddd') }}{% else %}#fff{% endif %};
-                            color:{% if naver.percent2 > naver.percent1 %}#fff{% else %}#23283a{% endif %};">
-                  {{ naver.percent2_str }}
-                </div>
-              </a>
+          <div class="row">
+            <div class="team">
+              <span class="pill" style="background:{{ team_colors.get(naver.team2, '#f1f1f1') }}20;border-color:#eee">{{naver.team2}}</span>
             </div>
+            <strong>{{naver.percent2_str}}</strong>
           </div>
-        </div>
-
-        {% if statiz.predict_text %}
-          <div class="predict-text">
-            📝 <b>예측 텍스트:</b> {{ statiz.predict_text }}
-          </div>
+        {% else %}
+          <div class="empty">해당 구단의 팬투표 데이터가 없습니다. (fanvote.html 갱신 필요)</div>
         {% endif %}
       </div>
 
-    {% elif selected_team %}
-      <div class="empty">
-        해당 구단의 예측 결과가 없습니다.
+      <div class="card">
+        <div class="title">Statiz 승부예측</div>
+        {% if statiz %}
+          <div class="row">
+            <div class="team"><span class="pill">{{statiz.left_team}}</span></div>
+            <strong>{{statiz.left_percent_str}}</strong>
+          </div>
+          <div class="row">
+            <div class="team"><span class="pill">{{statiz.right_team}}</span></div>
+            <strong>{{statiz.right_percent_str}}</strong>
+          </div>
+          {% if statiz.pitchers %}
+            <div class="muted">선발: {{statiz.pitchers}}</div>
+          {% endif %}
+        {% else %}
+          <div class="empty">해당 구단의 Statiz 예측 데이터가 없습니다. (statiz_cache.json 갱신/커밋 필요)</div>
+        {% endif %}
       </div>
-    {% endif %}
+    </div>
+
+    <div class="footer">
+      서버는 브라우저 없이 동작합니다. <code>fanvote.html</code>과 <code>statiz_cache.json</code>만 업데이트하세요.
+    </div>
   </div>
 </body>
 </html>
