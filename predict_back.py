@@ -1,14 +1,12 @@
-# predict_back.py
 import os, re, json, time, logging
 from typing import Dict, Any, List, Optional
 from flask import Flask, render_template, request
 from bs4 import BeautifulSoup
 
-# Selenium(Statiz) 비활성화 스위치: STATIZ_ENABLE=0 로 배포하면 우선 페이지가 뜹니다.
+# Selenium(Statiz) 켜기/끄기 스위치
 STATIZ_ENABLE = os.getenv("STATIZ_ENABLE", "1") == "1"
-
 if STATIZ_ENABLE:
-    from statiz_predict import fetch_all_predictions_fast  # Selenium 사용
+    from statiz_predict import fetch_all_predictions_fast
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -36,12 +34,12 @@ player_img_map = {
     "삼성":{"투수":"삼성_투수.png","야수":"삼성_야수.png"},
 }
 
-# ---------- 간단 헬스 체크 ----------
+# --------- 헬스 체크 ----------
 @app.route("/health")
 def health():
     return "ok", 200
 
-# ---------- 파일 캐시 유틸 ----------
+# --------- 파일 캐시 유틸 ----------
 def _load_cache(path: str) -> Dict[str, Any]:
     if not os.path.exists(path): return {}
     try:
@@ -62,7 +60,9 @@ def _is_fresh(ts_iso: Optional[str], ttl_min: int) -> bool:
         return False
     return (time.time() - ts) < ttl_min * 60
 
-# ---------- fanvote.html 파싱 + 캐시 ----------
+# --------- fanvote 파싱(+캐시) ----------
+TEAM_ALIAS = {"엘지":"LG","케이티":"KT","기아":"KIA"}  # 필요시 추가
+
 def _parse_fanvote_all(file_path: str) -> List[Dict[str, Any]]:
     if not os.path.exists(file_path):
         log.warning("fanvote.html not found at %s", file_path)
@@ -76,15 +76,19 @@ def _parse_fanvote_all(file_path: str) -> List[Dict[str, Any]]:
         teams_ = b.find_all("div", class_=re.compile(r"^MatchBox_name"))
         perc   = b.select("em[class^='MatchBox_rate'] span[class^='MatchBox_number']")
         if len(teams_)==2 and len(perc)==2:
+            t1 = teams_[0].get_text(strip=True)
+            t2 = teams_[1].get_text(strip=True)
+            t1 = TEAM_ALIAS.get(t1, t1)
+            t2 = TEAM_ALIAS.get(t2, t2)
             try:
                 out.append({
-                    "team1": teams_[0].get_text(strip=True),
-                    "team2": teams_[1].get_text(strip=True),
+                    "team1": t1,
+                    "team2": t2,
                     "percent1": float(perc[0].get_text(strip=True).replace('%','').strip()),
                     "percent2": float(perc[1].get_text(strip=True).replace('%','').strip()),
                 })
             except Exception as e:
-                log.warning("fanvote parse row skip: %s", e)
+                log.warning("fanvote row skip: %s", e)
     return out
 
 def _ensure_fanvote_cache() -> Dict[str, Any]:
@@ -115,7 +119,7 @@ def get_naver_match_for_team(team_name: str) -> Optional[Dict[str, Any]]:
             return r
     return None
 
-# ---------- 메인 뷰 ----------
+# --------- 메인 뷰 ----------
 @app.route("/", methods=["GET", "POST"])
 def index():
     selected_team = request.form.get("team") if request.method == "POST" else teams[0]
@@ -127,7 +131,7 @@ def index():
     except Exception as e:
         log.exception("naver parse failed: %s", e)
 
-    # STATIZ (무거우면 꺼두고 먼저 서비스 띄우기)
+    # STATIZ
     statiz_match = None
     if STATIZ_ENABLE:
         try:
@@ -153,7 +157,7 @@ def index():
         statiz=statiz_match,
         naver=naver_match,
         team_colors=team_colors,
-        player_img_map=player_img_map,   # ✨ 템플릿에서 필요
+        player_img_map=player_img_map,
     )
 
 if __name__ == "__main__":
