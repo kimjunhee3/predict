@@ -1,71 +1,38 @@
-# predict_back.py
 import os, logging, json
 from flask import Flask, render_template, request, abort, jsonify
 from bs4 import BeautifulSoup
 from pathlib import Path
 from datetime import datetime
 
-ENABLE_STATIZ = os.getenv("ENABLE_STATIZ", "1") == "1"
-
-# 라이브 스크랩은 옵션 (서버에선 종종 막힘)
-if ENABLE_STATIZ:
-    try:
-        from statiz_predict import fetch_all_predictions_fast
-    except Exception as _:
-        ENABLE_STATIZ = False  # 임포트 실패시 자동 비활성화
+from statiz_predict import fetch_all_predictions_fast, _load_cache, _today_kst_str
 
 app = Flask(__name__)
 log = logging.getLogger("predict")
 logging.basicConfig(level=logging.INFO)
 
 teams = ["한화","LG","KT","두산","SSG","키움","KIA","NC","롯데","삼성"]
-
 team_colors = {
     "한화":"#f37321","LG":"#c30452","KT":"#231f20","두산":"#13294b","SSG":"#d50032",
     "키움":"#5c0a25","KIA":"#d61c29","NC":"#1a419d","롯데":"#c9252c","삼성":"#0d3383"
 }
 
-# ---------- NAVER (fanvote.html) ----------
 def parse_naver_vote(team_name, file_path="fanvote.html"):
-    if not os.path.exists(file_path):
+    p = Path(file_path)
+    if not p.exists():
         return None
-    with open(file_path, "r", encoding="utf-8") as f:
-        soup = BeautifulSoup(f, "html.parser")
+    soup = BeautifulSoup(p.read_text(encoding="utf-8"), "html.parser")
     boxes = soup.select("div.MatchBox_match_box__IW-0f")
     for box in boxes:
         teams_ = box.select("div.MatchBox_name__m2MCa")
         percents = box.select("em.MatchBox_rate__nLGcu span.MatchBox_number__qdpPh")
         if len(teams_) == 2 and len(percents) == 2:
             t1, t2 = teams_[0].text.strip(), teams_[1].text.strip()
-            p1, p2 = percents[0].text.strip(), percents[1].text.strip()
+            p1 = percents[0].text.strip().replace(",","")
+            p2 = percents[1].text.strip().replace(",","")
             if team_name in (t1, t2):
                 return {"team1": t1, "team2": t2,
                         "percent1": float(p1), "percent2": float(p2)}
     return None
-
-# ---------- STATIZ 캐시 ----------
-CACHE_PATH = Path("statiz_cache.json")
-
-def read_statiz_cache():
-    if not CACHE_PATH.exists():
-        return None
-    try:
-        with CACHE_PATH.open(encoding="utf-8") as f:
-            data = json.load(f)
-        # 예상 구조: {"rows": [...], "fetched_at": "..."}
-        return data.get("rows") if isinstance(data, dict) else data
-    except Exception as e:
-        log.error("read_statiz_cache error: %s", e)
-        return None
-
-def write_statiz_cache(rows):
-    try:
-        payload = {"fetched_at": datetime.utcnow().isoformat()+"Z", "rows": rows}
-        with CACHE_PATH.open("w", encoding="utf-8") as f:
-            json.dump(payload, f, ensure_ascii=False, indent=2)
-        log.info("statiz cache saved: %s rows", len(rows))
-    except Exception as e:
-        log.error("write_statiz_cache error: %s", e)
 
 @app.route("/health")
 def health():
@@ -73,57 +40,48 @@ def health():
 
 @app.route("/debug")
 def debug():
-    if os.getenv("APP_DEBUG") != "1":
-        abort(404)
     info = {}
+
     fanvote_path = Path("fanvote.html")
     info["fanvote_exists"] = fanvote_path.exists()
     if fanvote_path.exists():
         stat = fanvote_path.stat()
         info["fanvote_size"] = stat.st_size
         info["fanvote_mtime"] = datetime.fromtimestamp(stat.st_mtime).isoformat()
-    info["statiz_cache_exists"] = CACHE_PATH.exists()
-    if CACHE_PATH.exists():
+
+    cache_path = Path("statiz_cache.json")
+    info["statiz_cache_exists"] = cache_path.exists()
+    if cache_path.exists():
         try:
-            with CACHE_PATH.open(encoding="utf-8") as f:
-                data = json.load(f)
-            rows = data.get("rows", [])
-            info["statiz_cache_count"] = len(rows)
-            info["statiz_cache_fetched_at"] = data.get("fetched_at")
+            data = json.loads(cache_path.read_text(encoding="utf-8"))
+            info["statiz_cache_keys"] = list(data.keys())[:10]
+            info["today_key"] = _today_kst_str()
         except Exception as e:
             info["statiz_cache_error"] = str(e)
+
     return jsonify(info)
 
 @app.route("/", methods=["GET","POST"])
 def index():
     selected_team = request.form.get("team") if request.method == "POST" else teams[0]
 
-    # NAVER (파일)
+    # 1) 네이버 (정적 HTML)
     naver_match = parse_naver_vote(selected_team)
 
-    # STATIZ: 1) 캐시 읽기 2) 가능하면 라이브 갱신
+    # 2) STATIZ (캐시가 없거나 TTL 지난 경우 자동 크롤링 후 캐시 저장)
     statiz_match = None
-    rows = read_statiz_cache() or []
-    for r in rows:
-        if selected_team in (r.get("left_team"), r.get("right_team")):
-            statiz_match = dict(r)
-            break
-
-    if ENABLE_STATIZ:
-        try:
-            live_rows = fetch_all_predictions_fast(
-                headless=True, use_cache=True, ttl_minutes=30,
-                force_refresh=False, fill_detail=True
-            )
-            if live_rows:
-                write_statiz_cache(live_rows)
-                # 선택팀 매치 갱신
-                for r in live_rows:
-                    if selected_team in (r.get("left_team"), r.get("right_team")):
-                        statiz_match = dict(r)
-                        break
-        except Exception as e:
-            log.error("statiz live fetch failed: %s", e)
+    try:
+        rows = fetch_all_predictions_fast(
+            headless=True, use_cache=True, ttl_minutes=int(os.getenv("STATIZ_TTL_MIN","30")),
+            force_refresh=False, fill_detail=True
+        )
+        for r in rows:
+            if selected_team in (r.get("left_team"), r.get("right_team")):
+                statiz_match = dict(r)
+                break
+    except Exception as e:
+        log.error("statiz fetch failed: %s", e)
+        # 캐시만 읽어 fallback 하고 싶으면 여기에서 _load_cache()를 사용해도 된다.
 
     # 포맷팅
     if statiz_match and statiz_match.get("left_percent") is not None:
