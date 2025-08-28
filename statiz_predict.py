@@ -51,23 +51,24 @@ def clear_cache():
 # ----------------- Selenium Driver (클라우드 친화 옵션) -----------------
 def _make_driver(headless: bool = True) -> webdriver.Chrome:
     opts = Options()
+    # 컨테이너에 설치된 chromium의 위치
+    opts.binary_location = os.getenv("CHROME_BIN", "/usr/bin/chromium")
+
     if headless:
-        # 일부 환경에서 new가 막히는 경우가 있어 구형 플래그 사용
-        opts.add_argument("--headless")
+        opts.add_argument("--headless=new")
     opts.add_argument("--disable-gpu")
     opts.add_argument("--no-sandbox")
     opts.add_argument("--disable-dev-shm-usage")
     opts.add_argument("--window-size=1280,1600")
-    opts.add_argument("--lang=ko-KR")
-    opts.add_argument("--disable-blink-features=AutomationControlled")
     opts.add_argument(
         "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     )
-    # 스크립트 로딩 도중에도 제어 가능하도록
-    opts.set_capability("pageLoadStrategy", "eager")
-    driver = webdriver.Chrome(options=opts)
-    driver.set_page_load_timeout(45)
+
+    # 컨테이너에 설치된 chromedriver의 위치
+    service = Service(executable_path=os.getenv("CHROMEDRIVER", "/usr/bin/chromedriver"))
+    driver = webdriver.Chrome(service=service, options=opts)
+    driver.set_page_load_timeout(30)
     return driver
 
 # ----------------- 파싱 유틸 -----------------
