@@ -13,8 +13,10 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 
 BASE_URL = "https://statiz.sporki.com/prediction/"
-CACHE_PATH = "statiz_cache.json"
-DEFAULT_TTL_MIN = 30
+CACHE_PATH = "statiz_cache.json"          # 캐시 파일 경로
+DEFAULT_TTL_MIN = int(os.getenv("STATIZ_TTL_MIN", "30"))
+
+# ===================== 시간/캐시 유틸 =====================
 
 def _now_kst() -> datetime:
     return datetime.utcnow().replace(tzinfo=timezone.utc) + timedelta(hours=9)
@@ -48,30 +50,35 @@ def clear_cache():
     if os.path.exists(CACHE_PATH):
         os.remove(CACHE_PATH)
 
-# ----------------- Selenium Driver (클라우드 친화 옵션) -----------------
+# ===================== Selenium 드라이버 =====================
+
 def _make_driver(headless: bool = True) -> webdriver.Chrome:
     opts = Options()
-    # 컨테이너에 설치된 chromium의 위치
-    opts.binary_location = os.getenv("CHROME_BIN", "/usr/bin/chromium")
+    # Dockerfile에서 지정한 바이너리 경로 사용
+    chrome_bin = os.environ.get("CHROME_BIN")
+    if chrome_bin:
+        opts.binary_location = chrome_bin
 
     if headless:
+        # chromium 최신 headless
         opts.add_argument("--headless=new")
     opts.add_argument("--disable-gpu")
     opts.add_argument("--no-sandbox")
     opts.add_argument("--disable-dev-shm-usage")
     opts.add_argument("--window-size=1280,1600")
+    opts.add_argument("--disable-extensions")
+    opts.add_argument("--disable-software-rasterizer")
     opts.add_argument(
-        "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "user-agent=Mozilla/5.0 (X11; Linux x86_64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     )
-
-    # 컨테이너에 설치된 chromedriver의 위치
-    service = Service(executable_path=os.getenv("CHROMEDRIVER", "/usr/bin/chromedriver"))
-    driver = webdriver.Chrome(service=service, options=opts)
+    # /usr/bin/chromedriver 가 PATH에 있으므로 별도 Service 지정 불필요
+    driver = webdriver.Chrome(options=opts)
     driver.set_page_load_timeout(30)
     return driver
 
-# ----------------- 파싱 유틸 -----------------
+# ===================== 파싱 유틸 =====================
+
 def _clean_text(s: str) -> str:
     return re.sub(r"\s+", " ", s or "").strip()
 
@@ -83,15 +90,8 @@ def _percent_from_style(style: str) -> Optional[float]:
     m = re.search(r"width:\s*(\d+(?:\.\d+)?)\s*%", style or "")
     return float(m.group(1)) if m else None
 
-def _extract_snos_from_html(html: str) -> List[str]:
-    cand = re.findall(r"s_no=(\d+)", html or "")
-    seen, out = set(), []
-    for s in cand:
-        if s not in seen:
-            seen.add(s); out.append(s)
-    return out
+# ===================== s_no 수집(+캐시) =====================
 
-# ----------------- s_no 목록 -----------------
 def generate_s_no_list(
     headless: bool = True,
     use_cache: bool = True,
@@ -110,51 +110,45 @@ def generate_s_no_list(
     driver = _make_driver(headless=headless)
     try:
         driver.get(BASE_URL)
-        # 1차: DOM에서 추출
-        snos = []
-        try:
-            WebDriverWait(driver, 30).until(
-                EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div.swiper-slide.item"))
-            )
-            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-            time.sleep(0.6)
-            driver.execute_script("window.scrollTo(0, 0);")
-            time.sleep(0.2)
-            slides = driver.find_elements(By.CSS_SELECTOR, "div.swiper-slide.item")
-            for sl in slides:
-                try:
-                    onclick = sl.find_element(By.CSS_SELECTOR, "a[onclick]").get_attribute("onclick") or ""
-                    m = re.search(r"s_no=(\d+)", onclick)
-                    if m:
-                        snos.append(m.group(1))
-                except NoSuchElementException:
-                    pass
-        except TimeoutException:
-            pass
+        WebDriverWait(driver, 20).until(
+            EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div.swiper-slide.item"))
+        )
+        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+        time.sleep(0.6)
+        driver.execute_script("window.scrollTo(0, 0);")
+        time.sleep(0.2)
 
-        # 2차: 폴백(HTML 정규식)
-        if not snos:
-            snos = _extract_snos_from_html(driver.page_source)
+        slides = driver.find_elements(By.CSS_SELECTOR, "div.swiper-slide.item")
+        s_nos = []
+        for sl in slides:
+            try:
+                onclick = sl.find_element(By.CSS_SELECTOR, "a[onclick]").get_attribute("onclick") or ""
+                m = re.search(r"s_no=(\d+)", onclick)
+                if m:
+                    s_nos.append(m.group(1))
+            except NoSuchElementException:
+                pass
 
-        # 중복 제거
         seen, uniq = set(), []
-        for s in snos:
+        for s in s_nos:
             if s not in seen:
                 seen.add(s); uniq.append(s)
 
         if use_cache:
             cache[cache_key] = {"ts": _now_kst().isoformat(timespec="seconds"), "data": uniq}
             _save_cache(cache)
+
         return uniq
     finally:
         driver.quit()
 
-# ----------------- 상세 파싱 -----------------
+# ===================== 단일 경기 파싱(상세) =====================
+
 def _parse_single_prediction(driver, s_no: str) -> Dict:
     url = f"{BASE_URL}?s_no={s_no}"
     driver.get(url)
     try:
-        WebDriverWait(driver, 20).until(
+        WebDriverWait(driver, 15).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "div.predict, .team_name"))
         )
     except TimeoutException:
@@ -175,8 +169,13 @@ def _parse_single_prediction(driver, s_no: str) -> Dict:
     try:
         left_item = driver.find_element(By.CSS_SELECTOR, ".predict .p_item.left")
         right_item = driver.find_element(By.CSS_SELECTOR, ".predict .p_item.right")
-        left_percent = _extract_percent(_clean_text(left_item.text)) or _percent_from_style(left_item.get_attribute("style"))
-        right_percent = _extract_percent(_clean_text(right_item.text)) or _percent_from_style(right_item.get_attribute("style"))
+
+        left_percent = _extract_percent(_clean_text(left_item.text))
+        right_percent = _extract_percent(_clean_text(right_item.text))
+        if left_percent is None:
+            left_percent = _percent_from_style(left_item.get_attribute("style"))
+        if right_percent is None:
+            right_percent = _percent_from_style(right_item.get_attribute("style"))
     except NoSuchElementException:
         pass
 
@@ -198,7 +197,8 @@ def _parse_single_prediction(driver, s_no: str) -> Dict:
         "predict_text": predict_text,
     }
 
-# ----------------- 목록에서 동시 추출(+폴백) -----------------
+# ===================== 목록 페이지에서 긁기 =====================
+
 def scrape_list_page_predictions(
     headless: bool = True,
     use_cache: bool = True,
@@ -218,79 +218,65 @@ def scrape_list_page_predictions(
     rows: List[Dict] = []
     try:
         driver.get(BASE_URL)
+        WebDriverWait(driver, 20).until(
+            EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div.swiper-slide.item"))
+        )
 
-        # 1차: DOM 접근
-        slides = []
-        try:
-            WebDriverWait(driver, 30).until(
-                EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div.swiper-slide.item"))
-            )
-            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-            time.sleep(0.6)
-            driver.execute_script("window.scrollTo(0, 0);")
-            time.sleep(0.2)
-            slides = driver.find_elements(By.CSS_SELECTOR, "div.swiper-slide.item")
-        except TimeoutException:
-            slides = []
+        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+        time.sleep(0.6)
+        driver.execute_script("window.scrollTo(0, 0);")
+        time.sleep(0.2)
 
-        if slides:
-            for sl in slides:
-                s_no = None
-                try:
-                    onclick = sl.find_element(By.CSS_SELECTOR, "a[onclick]").get_attribute("onclick") or ""
-                    m = re.search(r"s_no=(\d+)", onclick)
-                    if m: s_no = m.group(1)
-                except NoSuchElementException:
-                    pass
+        slides = driver.find_elements(By.CSS_SELECTOR, "div.swiper-slide.item")
+        for sl in slides:
+            s_no = None
+            try:
+                onclick = sl.find_element(By.CSS_SELECTOR, "a[onclick]").get_attribute("onclick") or ""
+                m = re.search(r"s_no=(\d+)", onclick)
+                if m:
+                    s_no = m.group(1)
+            except NoSuchElementException:
+                pass
 
-                left_team = right_team = None
-                try:
-                    left = sl.find_element(By.CSS_SELECTOR, ".team_name .left.team_item")
-                    right = sl.find_element(By.CSS_SELECTOR, ".team_name .right.team_item")
-                    lt = _clean_text(left.get_attribute("innerText"))
-                    rt = _clean_text(right.get_attribute("innerText"))
-                    left_team = lt.split()[-1] if lt else None
-                    right_team = rt.split()[0] if rt else None
-                except NoSuchElementException:
-                    pass
+            left_team = right_team = None
+            try:
+                left = sl.find_element(By.CSS_SELECTOR, ".team_name .left.team_item")
+                right = sl.find_element(By.CSS_SELECTOR, ".team_name .right.team_item")
+                lt = _clean_text(left.get_attribute("innerText"))
+                rt = _clean_text(right.get_attribute("innerText"))
+                left_team = lt.split()[-1] if lt else None
+                right_team = rt.split()[0] if rt else None
+            except NoSuchElementException:
+                pass
 
-                left_percent = right_percent = None
-                try:
-                    litem = sl.find_element(By.CSS_SELECTOR, ".predict .p_item.left")
-                    ritem = sl.find_element(By.CSS_SELECTOR, ".predict .p_item.right")
-                    left_percent = _extract_percent(_clean_text(litem.text)) or _percent_from_style(litem.get_attribute("style"))
-                    right_percent = _extract_percent(_clean_text(ritem.text)) or _percent_from_style(ritem.get_attribute("style"))
-                except NoSuchElementException:
-                    pass
+            left_percent = right_percent = None
+            try:
+                litem = sl.find_element(By.CSS_SELECTOR, ".predict .p_item.left")
+                ritem = sl.find_element(By.CSS_SELECTOR, ".predict .p_item.right")
+                left_percent = _extract_percent(_clean_text(litem.text))
+                right_percent = _extract_percent(_clean_text(ritem.text))
+                if left_percent is None:
+                    left_percent = _percent_from_style(litem.get_attribute("style"))
+                if right_percent is None:
+                    right_percent = _percent_from_style(ritem.get_attribute("style"))
+            except NoSuchElementException:
+                pass
 
-                if s_no:
-                    rows.append({
-                        "s_no": s_no,
-                        "url": f"{BASE_URL}?s_no={s_no}",
-                        "left_team": left_team,
-                        "right_team": right_team,
-                        "left_percent": float(left_percent) if left_percent is not None else None,
-                        "right_percent": float(right_percent) if right_percent is not None else None,
-                        "predict_text": None,
-                    })
-
-        # 2차: DOM 실패 시, HTML에서 s_no만 추출해 최소행 구성
-        if not rows:
-            snos = _extract_snos_from_html(driver.page_source)
-            for s in snos:
+            if s_no:
                 rows.append({
-                    "s_no": s,
-                    "url": f"{BASE_URL}?s_no={s}",
-                    "left_team": None, "right_team": None,
-                    "left_percent": None, "right_percent": None,
+                    "s_no": s_no,
+                    "url": f"{BASE_URL}?s_no={s_no}",
+                    "left_team": left_team,
+                    "right_team": right_team,
+                    "left_percent": float(left_percent) if left_percent is not None else None,
+                    "right_percent": float(right_percent) if right_percent is not None else None,
                     "predict_text": None,
                 })
 
-        # 중복 제거
         uniq_rows, seen = [], set()
         for r in rows:
             key = r["s_no"]
-            if key in seen:
+            if key in seen: 
                 continue
             seen.add(key)
             uniq_rows.append(r)
@@ -298,11 +284,13 @@ def scrape_list_page_predictions(
         if use_cache:
             cache[cache_key] = {"ts": _now_kst().isoformat(timespec="seconds"), "data": uniq_rows}
             _save_cache(cache)
+
         return uniq_rows
     finally:
         driver.quit()
 
-# ----------------- 상세 보완 결합 -----------------
+# ===================== 상세 보완 + 캐시 저장 =====================
+
 def fetch_predictions(
     s_no_list: List[str],
     headless: bool = True,
@@ -333,11 +321,16 @@ def fetch_predictions(
                 data = _parse_single_prediction(driver, s_no)
                 for k in ("left_percent", "right_percent"):
                     if data.get(k) is not None:
-                        try: data[k] = float(data[k])
-                        except Exception: data[k] = None
+                        try:
+                            data[k] = float(data[k])
+                        except Exception:
+                            data[k] = None
                 if use_cache:
                     cache_key = f"pred:{day_key}:{s_no}"
-                    cache[cache_key] = {"ts": _now_kst().isoformat(timespec="seconds"), "data": data}
+                    cache[cache_key] = {
+                        "ts": _now_kst().isoformat(timespec="seconds"),
+                        "data": data,
+                    }
                 cached_data[s_no] = data
                 time.sleep(0.3)
         finally:
@@ -345,6 +338,8 @@ def fetch_predictions(
             driver.quit()
 
     return [cached_data[s_no] for s_no in s_no_list if s_no in cached_data]
+
+# ===================== 하이브리드: 목록 긁고 누락 상세 보완 =====================
 
 def fetch_all_predictions_fast(
     headless: bool = True,
@@ -354,8 +349,12 @@ def fetch_all_predictions_fast(
     fill_detail: bool = True,
 ) -> List[Dict]:
     rows = scrape_list_page_predictions(
-        headless=headless, use_cache=use_cache, ttl_minutes=ttl_minutes, force_refresh=force_refresh
+        headless=headless,
+        use_cache=use_cache,
+        ttl_minutes=ttl_minutes,
+        force_refresh=force_refresh,
     )
+
     if not fill_detail:
         return rows
 
@@ -370,7 +369,11 @@ def fetch_all_predictions_fast(
         return rows
 
     detailed = {d["s_no"]: d for d in fetch_predictions(
-        need_snos, headless=headless, use_cache=use_cache, ttl_minutes=ttl_minutes, force_refresh=force_refresh
+        need_snos,
+        headless=headless,
+        use_cache=use_cache,
+        ttl_minutes=ttl_minutes,
+        force_refresh=force_refresh,
     )}
 
     merged: List[Dict] = []
