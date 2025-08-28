@@ -31,7 +31,6 @@
 </head>
 <body>
   <div class="container">
-    <!-- (옵션) 팀 셀렉터가 필요하면 form 표시 -->
     <form action="/" method="POST">
       <select name="team" onchange="this.form.submit()">
         {% for team in teams %}
@@ -44,26 +43,21 @@
       <div class="match-card">
         <div class="teams-vs">
           <div class="team-box">
-            <img
-              class="team-img"
-              src="/static/player/{{ (player_img_map.get(statiz.left_team, {}).get('야수') or 'placeholder.png') }}"
-              alt="{{ statiz.left_team }}"
-            />
+            <img class="team-img"
+                 src="/static/player/{{ (player_img_map.get(statiz.left_team, {}).get('야수') or 'placeholder.png') }}"
+                 alt="{{ statiz.left_team }}" />
             <div class="team-label">{{ statiz.left_team }}</div>
           </div>
           <div class="vs">VS</div>
           <div class="team-box">
-            <img
-              class="team-img"
-              src="/static/player/{{ (player_img_map.get(statiz.right_team, {}).get('투수') or 'placeholder.png') }}"
-              alt="{{ statiz.right_team }}"
-            />
+            <img class="team-img"
+                 src="/static/player/{{ (player_img_map.get(statiz.right_team, {}).get('투수') or 'placeholder.png') }}"
+                 alt="{{ statiz.right_team }}" />
             <div class="team-label">{{ statiz.right_team }}</div>
           </div>
         </div>
 
         <div class="bar-chart">
-          <!-- STATIZ -->
           <div class="bar-row">
             <div class="bar-label statiz">STATIZ</div>
             <div class="bar-dynamic">
@@ -86,7 +80,6 @@
             </div>
           </div>
 
-          <!-- NAVER -->
           <div class="bar-row">
             <div class="bar-label naver">NAVER</div>
             <div class="bar-dynamic">
