@@ -1,0 +1,102 @@
+<!-- templates/predict.html -->
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>구단별 승부예측 비교</title>
+  <style>
+    body { font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+           background:#ffffff; color:#2c3e50; margin:0; min-height:100vh; overflow:hidden; line-height:1.6; }
+    .container { max-width:700px; margin:0; padding:20px; background:#ffffff; border-radius:16px; height:570px; overflow:hidden; }
+    h1 { font-size:1.6rem; font-weight:600; color:#34495e; margin-bottom:20px; text-align:center; letter-spacing:-0.5px; }
+    form { display:none; }
+    .match-card { background:#f8f9fa; border-radius:18px; padding:20px; margin:0 0 20px 0; max-width:600px; }
+    .teams-vs { display:flex; justify-content:space-between; align-items:stretch; gap:20px; background:#ffffff; padding:16px; border-radius:16px; }
+    .team-box { display:flex; flex-direction:column; align-items:center; width:45%; }
+    .team-img { width:100%; height:240px; object-fit:contain; object-position:center; border-radius:8px; background:#ffffff; padding:30px; box-sizing:border-box; }
+    .team-label { margin-top:12px; font-size:1.1rem; font-weight:600; color:#34495e; }
+    .vs { font-size:1.8rem; font-weight:700; color:#7f8c8d; align-self:center; width:10%; text-align:center; }
+    .bar-chart { display:flex; flex-direction:column; margin-top:24px; gap:12px; }
+    .bar-row { display:flex; height:40px; font-weight:600; font-size:0.95rem; border-radius:20px; overflow:hidden; background:#ffffff; margin-bottom:8px; }
+    .bar-label { width:80px; text-align:center; line-height:40px; background:#f8f9fa; color:#34495e; border-radius:20px 0 0 20px; }
+    .bar-label.statiz { background:#fce4ec; color:#ad1457; }
+    .bar-label.naver  { background:#e3f2fd; color:#1565c0; }
+    .bar-dynamic { display:flex; flex-grow:1; }
+    .bar-left, .bar-right { text-align:center; line-height:40px; font-weight:600; transition:all 0.2s ease; }
+    .bar-link { display:block; height:40px; text-decoration:none; }
+    .bar-link:hover .bar-left, .bar-link:hover .bar-right { opacity:0.9; }
+    .predict-text { margin-top:16px; margin-bottom:0; font-size:0.9rem; color:#2c3e50; background:#f1f3f4; border-radius:18px; padding:12px 16px; line-height:1.5; max-width:500px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <form action="/" method="POST">
+      <select name="team" onchange="this.form.submit()">
+        {% for team in teams %}
+          <option value="{{ team }}" {% if selected_team == team %}selected{% endif %}>{{ team }}</option>
+        {% endfor %}
+      </select>
+    </form>
+
+    {% if selected_team and statiz and naver %}
+    <div class="match-card">
+      <div class="teams-vs">
+        <div class="team-box">
+          <img class="team-img" src="/static/player/{{ selected_team == statiz.left_team and player_img_map[statiz.left_team]['야수'] or player_img_map[statiz.left_team]['야수'] }}">
+          <div class="team-label">{{ statiz.left_team }}</div>
+        </div>
+        <div class="vs">VS</div>
+        <div class="team-box">
+          <img class="team-img" src="/static/player/{{ player_img_map[statiz.right_team]['투수'] }}">
+          <div class="team-label">{{ statiz.right_team }}</div>
+        </div>
+      </div>
+
+      <div class="bar-chart">
+        <div class="bar-row">
+          <div class="bar-label statiz">STATIZ</div>
+          <div class="bar-dynamic">
+            <a class="bar-link" href="https://statiz.sporki.com/prediction/" target="_blank" style="width: {{ statiz.left_percent }}%;">
+              <div class="bar-left" style="width:100%; background-color:{% if statiz.left_percent > statiz.right_percent %}{{ team_colors[statiz.left_team] }}{% else %}#fff{% endif %}; color:{% if statiz.left_percent > statiz.right_percent %}#fff{% else %}#23283a{% endif %};">
+                {{ statiz.left_percent_str }}
+              </div>
+            </a>
+            <a class="bar-link" href="https://statiz.sporki.com/prediction/" target="_blank" style="width: {{ statiz.right_percent }}%;">
+              <div class="bar-right" style="width:100%; background-color:{% if statiz.right_percent > statiz.left_percent %}{{ team_colors[statiz.right_team] }}{% else %}#fff{% endif %}; color:{% if statiz.right_percent > statiz.left_percent %}#fff{% else %}#23283a{% endif %};">
+                {{ statiz.right_percent_str }}
+              </div>
+            </a>
+          </div>
+        </div>
+
+        <div class="bar-row">
+          <div class="bar-label naver">NAVER</div>
+          <div class="bar-dynamic">
+            <a class="bar-link" href="https://m.sports.naver.com/predict?tab=today&groupId=kbaseball&categoryId=kbo" target="_blank" style="width: {{ naver.percent1 }}%;">
+              <div class="bar-left" style="width:100%; background-color:{% if naver.percent1 > naver.percent2 %}{{ team_colors[statiz.left_team] }}{% else %}#fff{% endif %}; color:{% if naver.percent1 > naver.percent2 %}#fff{% else %}#23283a{% endif %};">
+                {{ naver.percent1_str }}
+              </div>
+            </a>
+            <a class="bar-link" href="https://m.sports.naver.com/predict?tab=today&groupId=kbaseball&categoryId=kbo" target="_blank" style="width: {{ naver.percent2 }}%;">
+              <div class="bar-right" style="width:100%; background-color:{% if naver.percent2 > naver.percent1 %}{{ team_colors[statiz.right_team] }}{% else %}#fff{% endif %}; color:{% if naver.percent2 > naver.percent1 %}#fff{% else %}#23283a{% endif %};">
+                {{ naver.percent2_str }}
+              </div>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      {% if statiz.predict_text %}
+      <div class="predict-text">
+        📝 <b>예측 텍스트:</b> {{ statiz.predict_text }}
+      </div>
+      {% endif %}
+    </div>
+    {% elif selected_team %}
+      <div style="color:#7f8c8d; text-align:center; margin-top:40px; padding:20px; background:#f8f9fa; border-radius:8px; border:1px solid #e8ecef;">
+        해당 구단의 예측 결과가 없습니다.
+      </div>
+    {% endif %}
+  </div>
+</body>
+</html>
