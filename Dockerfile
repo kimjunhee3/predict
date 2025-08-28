@@ -1,9 +1,5 @@
+# Dockerfile
 FROM python:3.11-slim
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    chromium chromium-driver fonts-nanum fonts-noto-cjk \
-    ca-certificates curl unzip gnupg && \
-    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -12,8 +8,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-ENV CHROME_BIN=/usr/bin/chromium
-ENV CHROMEDRIVER_BIN=/usr/bin/chromedriver
 ENV PYTHONUNBUFFERED=1
+# Railway가 실제 포트를 주입하지만, 로컬용 기본값도 넣어둡니다.
+ENV PORT=8080
+ENV WEB_CONCURRENCY=2
 
-CMD ["bash","-lc","gunicorn predict_back:app --bind 0.0.0.0:${PORT:-8080} --workers 2 --threads 4 --timeout 120"]
+# ★ shell form으로 변경해서 $PORT가 런타임에 치환되도록 함
+CMD sh -c 'gunicorn -w ${WEB_CONCURRENCY:-2} -k gthread -b 0.0.0.0:${PORT} predict_back:app'
