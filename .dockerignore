@@ -1,5 +1,13 @@
 .git
+.gitignore
+.vscode/
+.idea/
 __pycache__/
-*.pyc
+*.py[cod]
+*.log
 .env
+.env.*
 naver_cookies.json
+statiz_cache.json
+node_modules/
+tests/
