@@ -5,9 +5,6 @@ __pycache__/
 *.log
 .venv/
 .env
-.git
+.git/
 .gitignore
 .DS_Store
-/data/
-statiz_cache.json
-*.tmp
