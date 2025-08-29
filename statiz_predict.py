@@ -316,16 +316,12 @@ def scrape_list_page_predictions(
             if r.get("left_team") and r.get("right_team")
             and r.get("left_percent") is not None and r.get("right_percent") is not None
         ]
-        if use_cache && complete and len(complete) == len(uniq_rows):
+        if use_cache and complete and len(complete) == len(uniq_rows):
             cache[cache_key] = {
                 "ts": _now_kst().isoformat(timespec="seconds"),
                 "data": complete
             }
             _save_cache(cache)
-
-        return uniq_rows
-    finally:
-        driver.quit()
 
 # ---------------------------------------------------------------------------
 # 다건 예측 수집
