@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-원격 JSON(깃허브 raw) → /data/statiz_cache.json 로컬 캐시
+원격 JSON(깃허브 raw 등) → /data/statiz_cache.json 로컬 캐시
 - REMOTE_CACHE_URL에서 받아오고 /data에 저장
 - 실패 시 레포에 번들된 statiz_cache.json을 폴백
 - predlist:<YYYY-MM-DD>의 data 배열을 오늘자(없으면 최신)로 반환
