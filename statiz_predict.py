@@ -82,6 +82,9 @@ def _make_driver(headless: bool = True) -> webdriver.Chrome:
     opts = Options()
     if headless:
         opts.add_argument("--headless=new")
+    # ▶ 추가 안정 옵션
+    opts.page_load_strategy = "eager"
+    opts.add_argument("--lang=ko_KR")
     opts.add_argument("--disable-gpu")
     opts.add_argument("--no-sandbox")
     opts.add_argument("--disable-dev-shm-usage")
@@ -118,7 +121,7 @@ def _percent_from_style(style: str) -> Optional[float]:
     return float(m.group(1)) if m else None
 
 # -----------------------------------------------------------------------------
-# s_no 목록 수집 (+캐시)
+# s_no 목록 수집 (+재시도/폴백, 캐시)
 # -----------------------------------------------------------------------------
 
 def generate_s_no_list(
@@ -139,28 +142,72 @@ def generate_s_no_list(
     driver = _make_driver(headless=headless)
     try:
         driver.get(BASE_URL)
-        WebDriverWait(driver, 20).until(
-            EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div.swiper-slide.item"))
-        )
-        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);"); time.sleep(0.6)
-        driver.execute_script("window.scrollTo(0, 0);"); time.sleep(0.2)
 
-        slides = driver.find_elements(By.CSS_SELECTOR, "div.swiper-slide.item")
+        # 문서 준비(짧게)
+        try:
+            WebDriverWait(driver, 12).until(
+                lambda d: d.execute_script("return document.readyState") in ("interactive", "complete")
+            )
+        except Exception:
+            pass
+
         s_nos: List[str] = []
-        for sl in slides:
-            try:
-                onclick = sl.find_element(By.CSS_SELECTOR, "a[onclick]").get_attribute("onclick") or ""
-                m = re.search(r"s_no=(\d+)", onclick)
-                if m:
-                    s_nos.append(m.group(1))
-            except NoSuchElementException:
-                pass
+        errors = []
 
+        # 최대 2회 재시도: CSS → 스크롤 → JS 폴백
+        for _ in range(2):
+            try:
+                WebDriverWait(driver, 15).until(
+                    EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div.swiper-slide.item"))
+                )
+                for _ in range(2):
+                    driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+                    time.sleep(0.8)
+                driver.execute_script("window.scrollTo(0, 0);")
+                time.sleep(0.2)
+
+                slides = driver.find_elements(By.CSS_SELECTOR, "div.swiper-slide.item a[onclick*='s_no=']")
+                if not slides:
+                    raise TimeoutException("no anchors with s_no found in slides")
+
+                for a in slides:
+                    onclick = a.get_attribute("onclick") or ""
+                    m = re.search(r"s_no=(\d+)", onclick)
+                    if m:
+                        s_nos.append(m.group(1))
+                if s_nos:
+                    break
+            except Exception as e:
+                errors.append(str(e))
+
+            # 폴백: 페이지 전체에서 onclick 추출
+            try:
+                anchors = driver.find_elements(By.CSS_SELECTOR, "a[onclick*='s_no=']")
+                if not anchors:
+                    for _ in range(3):
+                        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+                        time.sleep(0.8)
+                    anchors = driver.find_elements(By.CSS_SELECTOR, "a[onclick*='s_no=']")
+
+                for a in anchors:
+                    onclick = a.get_attribute("onclick") or ""
+                    m = re.search(r"s_no=(\d+)", onclick)
+                    if m:
+                        s_nos.append(m.group(1))
+                if s_nos:
+                    break
+            except Exception as e:
+                errors.append(f"fallback-js:{e}")
+
+        # 중복 제거
         uniq, seen = [], set()
         for s in s_nos:
             if s not in seen:
                 seen.add(s)
                 uniq.append(s)
+
+        if not uniq:
+            raise TimeoutException(f"Failed to collect s_no (errors={errors})")
 
         if use_cache:
             cache[cache_key] = {"ts": _now_kst().isoformat(timespec="seconds"), "data": uniq}
@@ -315,7 +362,7 @@ def scrape_list_page_predictions(
 
         return uniq_rows
     finally:
-        # ⬅️ 이 finally가 반드시 있어야 합니다 (이게 빠지면 바로 SyntaxError 원인)
+        # 반드시 finally로 종료 (이게 빠지면 SyntaxError 유발 지점)
         driver.quit()
 
 # -----------------------------------------------------------------------------
