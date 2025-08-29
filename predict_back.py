@@ -1,19 +1,18 @@
 import os
-import requests
 from flask import Flask, render_template, request, jsonify
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup  # NAVER 스냅샷 사용할 때만 필요
+import requests
 
-from statiz_predict import (
-    generate_s_no_list,
-    fetch_predictions,
-    fetch_all_predictions_fast,
-    DEFAULT_TTL_MIN,
-    _load_cache,
+from statiz_reader import (
+    fetch_remote_into_cache,
+    get_today_predlist,
+    find_match_for_team,
     _today_kst_str,
 )
 
 app = Flask(__name__)
 
+# 팀/색상/이미지 매핑 (기존 그대로)
 teams = ["한화", "LG", "KT", "두산", "SSG", "키움", "KIA", "NC", "롯데", "삼성"]
 
 team_colors = {
@@ -21,6 +20,7 @@ team_colors = {
     "키움": "#5c0a25", "KIA": "#d61c29", "NC": "#1a419d", "롯데": "#c9252c", "삼성": "#0d3383"
 }
 
+# NAVER 영역(선택)
 NAVER_VOTE_URL = "https://m.sports.naver.com/predict?tab=today&groupId=kbaseball&categoryId=kbo"
 USE_NAVER_LIVE = os.environ.get("USE_NAVER_LIVE", "0") == "1"
 
@@ -65,98 +65,42 @@ def parse_naver_vote_live(team_name):
 def health():
     return "ok"
 
-# 현재 STATIZ에서 s_no 추출 재시도(강제)
-@app.route("/debug/snos")
-def debug_snos():
-    try:
-        snos = generate_s_no_list(headless=True, use_cache=False, ttl_minutes=DEFAULT_TTL_MIN, force_refresh=True)
-        return jsonify({"s_nos_live": snos})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-# 현재 캐시 키/오늘 predlist 확인
+# 디버그: 원격 캐시 → 로컬 저장/읽기 상태 확인
 @app.route("/debug/cache")
 def debug_cache():
-    cache = _load_cache()
-    day_key = _today_kst_str()
+    data = fetch_remote_into_cache(force=False)
+    keys = list(data.keys())
+    pred_today = data.get(f"predlist:{_today_kst_str()}")
     return jsonify({
-        "keys": list(cache.keys())[:100],
-        "predlist_today": cache.get(f"predlist:{day_key}")
+        "keys_count": len(keys),
+        "has_today_predlist": bool(pred_today),
+        "today_key": f"predlist:{_today_kst_str()}",
     })
 
-# 최근 HTML 덤프 파일 정보(문제 원인 파악용)
-@app.route("/debug/source")
-def debug_source():
-    base = "/data" if os.path.isdir("/data") else "."
-    files = [f for f in os.listdir(base) if f.startswith("statiz_") and f.endswith(".html")]
-    files.sort()
-    metas = []
-    for fn in files[-10:]:
-        path = os.path.join(base, fn)
-        try:
-            size = os.path.getsize(path)
-        except Exception:
-            size = -1
-        metas.append({"file": fn, "size": size, "path": path})
-    return jsonify({"dumps": metas})
+# 디버그: 강제 새로고침(원격 다시 fetch)
+@app.route("/debug/refresh")
+def debug_refresh():
+    data = fetch_remote_into_cache(force=True)
+    return jsonify({"refreshed": True, "keys_count": len(data.keys())})
 
 @app.route("/", methods=["GET", "POST"])
 def index():
     selected_team = request.form.get("team") if request.method == "POST" else teams[0]
 
-    # 목록 기반으로 먼저 시도
-    try:
-        rows = fetch_all_predictions_fast(
-            headless=True, use_cache=True, ttl_minutes=DEFAULT_TTL_MIN,
-            force_refresh=False, fill_detail=False
-        )
-    except Exception:
-        rows = []
+    # 1) 원격 JSON → 로컬 캐시(/data) 로드
+    cache_json = fetch_remote_into_cache(force=False)
 
-    if not rows:
-        try:
-            rows = fetch_all_predictions_fast(
-                headless=True, use_cache=False, ttl_minutes=DEFAULT_TTL_MIN,
-                force_refresh=True, fill_detail=False
-            )
-        except Exception:
-            rows = []
+    # 2) 오늘자(없으면 최신) predlist를 얻어와서 선택팀 경기 찾기
+    rows = get_today_predlist(cache_json)
+    statiz_match = find_match_for_team(rows, selected_team)
 
-    # 캐시 폴백
-    if not rows:
-        cache = _load_cache()
-        item = cache.get(f"predlist:{_today_kst_str()}")
-        rows = item["data"] if item and item.get("data") else []
-
-    if not rows:
-        # STATIZ가 전혀 안 될 때도 화면은 뜸(네이버만 가능)
-        if USE_NAVER_LIVE or os.path.exists("fanvote.html"):
-            naver_match = parse_naver_vote_live(selected_team) if USE_NAVER_LIVE \
-                          else parse_naver_vote_from_file(selected_team, "fanvote.html")
-        else:
-            naver_match = None
-        return render_template("predict.html",
-                               teams=teams, selected_team=selected_team,
-                               statiz=None, naver=naver_match,
-                               player_img_map={}, team_colors=team_colors)
-
-    statiz_match = next((r for r in rows if selected_team in [r.get("left_team"), r.get("right_team")]), None)
-
-    # 보완(필요 시 상세 1회)
-    if statiz_match and (statiz_match.get("left_percent") is None or statiz_match.get("right_percent") is None):
-        try:
-            detailed = fetch_predictions([statiz_match["s_no"]], headless=True, use_cache=True)
-            if detailed:
-                statiz_match = detailed[0]
-        except Exception:
-            pass
-
-    # NAVER
+    # 3) NAVER(선택)
     if USE_NAVER_LIVE:
         naver_match = parse_naver_vote_live(selected_team)
     else:
-        naver_match = parse_naver_vote_from_file(selected_team, file_path="fanvote.html")
+        naver_match = parse_naver_vote_from_file(selected_team, "fanvote.html")
 
+    # 이미지 매핑(기존과 동일)
     player_img_map = {
         "한화": {"투수": "한화_투수.png", "야수": "한화_야수.png"},
         "LG": {"투수": "엘지_투수.png", "야수": "엘지_야수.png"},
@@ -170,6 +114,7 @@ def index():
         "삼성": {"투수": "삼성_투수.png", "야수": "삼성_야수.png"}
     }
 
+    # 4) 퍼센트 포맷팅 (template에서 쓰는 필드 만들어 주기)
     if statiz_match and statiz_match.get("left_percent") is not None and statiz_match.get("right_percent") is not None:
         statiz_match["left_percent"] = round(float(statiz_match["left_percent"]), 1)
         statiz_match["right_percent"] = round(float(statiz_match["right_percent"]), 1)
@@ -182,11 +127,17 @@ def index():
         naver_match["percent1_str"] = f"{naver_match['percent1']:.1f}%"
         naver_match["percent2_str"] = f"{naver_match['percent2']:.1f}%"
 
-    return render_template("predict.html",
-                           teams=teams, selected_team=selected_team,
-                           statiz=statiz_match, naver=naver_match,
-                           player_img_map=player_img_map, team_colors=team_colors)
+    return render_template(
+        "predict.html",
+        teams=teams,
+        selected_team=selected_team,
+        statiz=statiz_match,
+        naver=naver_match,
+        player_img_map=player_img_map,
+        team_colors=team_colors
+    )
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", "8080"))
     app.run(host="0.0.0.0", port=port, debug=True)
+
