@@ -1,4 +1,3 @@
-# statiz_predict.py
 # -*- coding: utf-8 -*-
 """
 Statiz 승부예측 크롤러 + 파일 캐시
@@ -20,34 +19,30 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 
-# ---------------------------------------------------------------------------
-# 상수
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# 상수/경로
+# -----------------------------------------------------------------------------
 
 BASE_URL = "https://statiz.sporki.com/prediction/"
 
 def _resolve_cache_path() -> str:
-    # 1) 환경변수(CACHE_DIR) 우선
     cache_dir = os.environ.get("CACHE_DIR")
     if cache_dir:
         os.makedirs(cache_dir, exist_ok=True)
         return os.path.join(cache_dir, "statiz_cache.json")
-    # 2) Railway Volume 기본 경로
     if os.path.isdir("/data"):
         os.makedirs("/data", exist_ok=True)
         return "/data/statiz_cache.json"
-    # 3) 로컬 파일
     return "statiz_cache.json"
 
 CACHE_PATH = _resolve_cache_path()
-DEFAULT_TTL_MIN = int(os.environ.get("CACHE_TTL_MIN", "30"))  # 캐시 기본 유효기간(분)
+DEFAULT_TTL_MIN = int(os.environ.get("CACHE_TTL_MIN", "30"))
 
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # 시간/캐시 유틸
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 def _now_kst() -> datetime:
-    """KST 현재 시각"""
     return datetime.utcnow().replace(tzinfo=timezone.utc) + timedelta(hours=9)
 
 def _today_kst_str() -> str:
@@ -79,16 +74,14 @@ def clear_cache():
     if os.path.exists(CACHE_PATH):
         os.remove(CACHE_PATH)
 
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Selenium 드라이버
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 def _make_driver(headless: bool = True) -> webdriver.Chrome:
     opts = Options()
     if headless:
         opts.add_argument("--headless=new")
-
-    # 컨테이너/서버 환경 안정 옵션
     opts.add_argument("--disable-gpu")
     opts.add_argument("--no-sandbox")
     opts.add_argument("--disable-dev-shm-usage")
@@ -96,25 +89,22 @@ def _make_driver(headless: bool = True) -> webdriver.Chrome:
     opts.add_argument("--disable-extensions")
     opts.add_argument("--remote-debugging-port=9222")
 
-    # Railway/컨테이너에서 크롬 바이너리 경로 지정
     chrome_bin = os.environ.get("GOOGLE_CHROME_BIN") or os.environ.get("CHROME_BIN")
     if chrome_bin:
         opts.binary_location = chrome_bin
 
-    # UA
     opts.add_argument(
         "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     )
 
-    # Selenium Manager 사용(별도 드라이버 경로 지정 불필요)
-    driver = webdriver.Chrome(options=opts)
+    driver = webdriver.Chrome(options=opts)  # Selenium Manager 사용
     driver.set_page_load_timeout(30)
     return driver
 
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # 파싱 유틸
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 def _clean_text(s: str) -> str:
     return re.sub(r"\s+", " ", s or "").strip()
@@ -127,9 +117,9 @@ def _percent_from_style(style: str) -> Optional[float]:
     m = re.search(r"width:\s*(\d+(?:\.\d+)?)\s*%", style or "")
     return float(m.group(1)) if m else None
 
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # s_no 목록 수집 (+캐시)
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 def generate_s_no_list(
     headless: bool = True,
@@ -180,9 +170,9 @@ def generate_s_no_list(
     finally:
         driver.quit()
 
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # 단일 경기 상세 파싱
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 def _parse_single_prediction(driver, s_no: str) -> Dict:
     url = f"{BASE_URL}?s_no={s_no}"
@@ -232,9 +222,9 @@ def _parse_single_prediction(driver, s_no: str) -> Dict:
         "predict_text": predict_text,
     }
 
-# ---------------------------------------------------------------------------
-# 목록 페이지 긁기
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# 목록 페이지 긁기 (완전하면 predlist 캐시 기록)
+# -----------------------------------------------------------------------------
 
 def scrape_list_page_predictions(
     headless: bool = True,
@@ -323,9 +313,14 @@ def scrape_list_page_predictions(
             }
             _save_cache(cache)
 
-# ---------------------------------------------------------------------------
-# 다건 예측 수집
-# ---------------------------------------------------------------------------
+        return uniq_rows
+    finally:
+        # ⬅️ 이 finally가 반드시 있어야 합니다 (이게 빠지면 바로 SyntaxError 원인)
+        driver.quit()
+
+# -----------------------------------------------------------------------------
+# 다건 예측 수집(+캐시, 상세 보완)
+# -----------------------------------------------------------------------------
 
 def fetch_predictions(
     s_no_list: List[str],
@@ -376,9 +371,9 @@ def fetch_predictions(
 
     return [cached_data[s_no] for s_no in s_no_list if s_no in cached_data]
 
-# ---------------------------------------------------------------------------
-# 하이브리드
-# ---------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# 하이브리드: 목록 + 누락만 상세 보완 (완성본을 predlist에 기록)
+# -----------------------------------------------------------------------------
 
 def fetch_all_predictions_fast(
     headless: bool = True,
@@ -439,6 +434,10 @@ def fetch_all_predictions_fast(
         _save_cache(cache)
 
     return merged
+
+# -----------------------------------------------------------------------------
+# CLI 테스트
+# -----------------------------------------------------------------------------
 
 if __name__ == "__main__":
     fast_rows = fetch_all_predictions_fast(
