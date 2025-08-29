@@ -3,6 +3,7 @@ import os
 import requests
 from flask import Flask, render_template, request, jsonify
 from bs4 import BeautifulSoup
+from flask_cors import CORS  # ✅ 추가
 
 from statiz_reader import (
     fetch_remote_into_cache,
@@ -13,7 +14,11 @@ from statiz_reader import (
 
 app = Flask(__name__)
 
-# 팀 목록/컬러
+# ✅ CORS: 프론트 도메인에서 호출 허용
+FRONTEND_ORIGIN = os.environ.get("FRONTEND_ORIGIN", "*")
+CORS(app, resources={r"/api/*": {"origins": FRONTEND_ORIGIN}})
+
+# 팀/색상
 teams = ["한화", "LG", "KT", "두산", "SSG", "키움", "KIA", "NC", "롯데", "삼성"]
 team_colors = {
     "한화": "#f37321", "LG": "#c30452", "KT": "#231f20", "두산": "#13294b", "SSG": "#d50032",
@@ -61,55 +66,40 @@ def parse_naver_vote_live(team_name):
     except Exception:
         return None
 
+# -------- 기존 페이지 라우트 --------
+@app.route("/")
+def index_page():
+    # 필요하면 기존 템플릿 렌더 유지
+    return render_template("predict.html", teams=teams, selected_team=teams[0],
+                           statiz=None, naver=None,
+                           player_img_map={}, team_colors=team_colors)
+
 @app.route("/health")
 def health():
     return "ok"
 
-@app.route("/debug/cache")
-def debug_cache():
-    data = fetch_remote_into_cache(force=False)
-    keys = list(data.keys())
-    pred_today = data.get(f"predlist:{_today_kst_str()}")
-    return jsonify({
-        "keys_count": len(keys),
-        "has_today_predlist": bool(pred_today),
-        "today_key": f"predlist:{_today_kst_str()}",
-    })
-
-@app.route("/debug/refresh")
-def debug_refresh():
-    data = fetch_remote_into_cache(force=True)
-    return jsonify({"refreshed": True, "keys_count": len(data.keys())})
-
-@app.route("/", methods=["GET", "POST"])
-def index():
-    selected_team = request.form.get("team") if request.method == "POST" else teams[0]
-
-    # 1) 원격 JSON → /data 캐시로 로드
+# -------- JSON API (React에서 사용) --------
+def build_payload_for_team(team: str) -> dict:
     cache_json = fetch_remote_into_cache(force=False)
-
-    # 2) 오늘자(없으면 최신) predlist에서 선택팀 경기 찾기
     rows = get_today_predlist(cache_json)
-    statiz_match = find_match_for_team(rows, selected_team)
+    statiz_match = find_match_for_team(rows, team)
 
-    # 3) NAVER (라이브 or 스냅샷)
     if USE_NAVER_LIVE:
-        naver_match = parse_naver_vote_live(selected_team)
+        naver_match = parse_naver_vote_live(team)
     else:
-        naver_match = parse_naver_vote_from_file(selected_team, "fanvote.html")
+        naver_match = parse_naver_vote_from_file(team, "fanvote.html")
 
-    # 4) NAVER가 없으면 STATIZ 값으로 대체(템플릿 수정 없이 표시되도록)
+    # NAVER가 없으면 STATIZ 값으로 대체 (프론트에서 막히지 않도록)
     if not naver_match and statiz_match:
         lp = float(statiz_match["left_percent"]) if statiz_match.get("left_percent") is not None else 0.0
         rp = float(statiz_match["right_percent"]) if statiz_match.get("right_percent") is not None else 0.0
         naver_match = {
             "team1": statiz_match.get("left_team") or "",
             "team2": statiz_match.get("right_team") or "",
-            "percent1": lp,
-            "percent2": rp,
+            "percent1": lp, "percent2": rp,
         }
 
-    # 5) 퍼센트 포맷팅
+    # 포맷팅
     if statiz_match and statiz_match.get("left_percent") is not None and statiz_match.get("right_percent") is not None:
         statiz_match["left_percent"] = round(float(statiz_match["left_percent"]), 1)
         statiz_match["right_percent"] = round(float(statiz_match["right_percent"]), 1)
@@ -122,30 +112,22 @@ def index():
         naver_match["percent1_str"] = f"{naver_match['percent1']:.1f}%"
         naver_match["percent2_str"] = f"{naver_match['percent2']:.1f}%"
 
-    # 이미지 매핑(기존과 동일)
-    player_img_map = {
-        "한화": {"투수": "한화_투수.png", "야수": "한화_야수.png"},
-        "LG": {"투수": "엘지_투수.png", "야수": "엘지_야수.png"},
-        "KT": {"투수": "KT_투수.png", "야수": "KT_야수.png"},
-        "두산": {"투수": "두산_투수.png", "야수": "두산_야수.png"},
-        "SSG": {"투수": "SSG_투수.png", "야수": "SSG_야수.png"},
-        "키움": {"투수": "키움_투수.png", "야수": "키움_야수.png"},
-        "KIA": {"투수": "KIA_투수.png", "야수": "KIA_야수.png"},
-        "NC": {"투수": "NC_투수.png", "야수": "NC_야수.png"},
-        "롯데": {"투수": "롯데_투수.png", "야수": "롯데_야수.png"},
-        "삼성": {"투수": "삼성_투수.png", "야수": "삼성_야수.png"}
+    return {
+        "team": team,
+        "statiz": statiz_match,
+        "naver": naver_match,
+        "team_colors": team_colors,
+        "has_data": bool(statiz_match),
+        "date_key": f"predlist:{_today_kst_str()}",
     }
 
-    return render_template(
-        "predict.html",
-        teams=teams,
-        selected_team=selected_team,
-        statiz=statiz_match,
-        naver=naver_match,
-        player_img_map=player_img_map,
-        team_colors=team_colors
-    )
+@app.route("/api/teams")
+def api_teams():
+    return jsonify({"teams": teams})
 
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", "8080"))
-    app.run(host="0.0.0.0", port=port, debug=True)
+@app.route("/api/predict")
+def api_predict():
+    team = request.args.get("team", teams[0])
+    if team not in teams:
+        return jsonify({"error": "unknown team"}), 400
+    return jsonify(build_payload_for_team(team))
