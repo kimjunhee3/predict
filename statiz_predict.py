@@ -12,12 +12,14 @@ import time
 from typing import List, Dict, Optional, Any
 from datetime import datetime, timedelta, timezone
 
+# ── selenium + uc
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
+import undetected_chromedriver as uc
 
 # -----------------------------------------------------------------------------
 # 상수/경로
@@ -37,6 +39,9 @@ def _resolve_cache_path() -> str:
 
 CACHE_PATH = _resolve_cache_path()
 DEFAULT_TTL_MIN = int(os.environ.get("CACHE_TTL_MIN", "30"))
+
+USE_MOBILE_UA = os.environ.get("MOBILE_UA", "0") == "1"
+USE_UC = os.environ.get("USE_UC", "1") == "1"  # 기본: uc 사용
 
 # -----------------------------------------------------------------------------
 # 시간/캐시 유틸
@@ -75,14 +80,71 @@ def clear_cache():
         os.remove(CACHE_PATH)
 
 # -----------------------------------------------------------------------------
-# Selenium 드라이버
+# 드라이버 (uc 우선, 실패 시 기존 selenium)
 # -----------------------------------------------------------------------------
 
+DESKTOP_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+              "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+MOBILE_UA = ("Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) "
+             "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1")
+
+def _make_driver_uc(headless: bool = True):
+    ua = MOBILE_UA if USE_MOBILE_UA else DESKTOP_UA
+    chrome_args = [
+        "--lang=ko_KR",
+        "--disable-gpu",
+        "--no-sandbox",
+        "--disable-dev-shm-usage",
+        "--window-size=1280,1600",
+        "--disable-extensions",
+        "--remote-debugging-port=9222",
+        f"--user-agent={ua}",
+    ]
+    if headless:
+        chrome_args.append("--headless=new")
+
+    # Railway 패키지 바이너리 경로
+    chrome_bin = os.environ.get("GOOGLE_CHROME_BIN") or os.environ.get("CHROME_BIN") or "/usr/bin/chromium"
+
+    return uc.Chrome(
+        headless=headless,
+        use_subprocess=False,
+        browser_executable_path=chrome_bin,
+        options=uc.ChromeOptions().add_argument,  # trick: 아래에서 for로 add
+    )
+
 def _make_driver(headless: bool = True) -> webdriver.Chrome:
+    """
+    1) undetected-chromedriver(uc) 시도
+    2) 실패 시 Selenium Manager 기본 크롬으로 폴백
+    """
+    if USE_UC:
+        try:
+            # uc는 옵션을 특이하게 추가해야 해서 별도 구성
+            opts = uc.ChromeOptions()
+            if headless:
+                opts.add_argument("--headless=new")
+            opts.add_argument("--lang=ko_KR")
+            opts.add_argument("--disable-gpu")
+            opts.add_argument("--no-sandbox")
+            opts.add_argument("--disable-dev-shm-usage")
+            opts.add_argument("--window-size=1280,1600")
+            opts.add_argument("--disable-extensions")
+            opts.add_argument("--remote-debugging-port=9222")
+            opts.add_argument(f"--user-agent={MOBILE_UA if USE_MOBILE_UA else DESKTOP_UA}")
+            chrome_bin = os.environ.get("GOOGLE_CHROME_BIN") or os.environ.get("CHROME_BIN")
+            if chrome_bin:
+                opts.binary_location = chrome_bin
+            driver = uc.Chrome(options=opts, headless=headless, use_subprocess=False)
+            driver.set_page_load_timeout(30)
+            return driver
+        except Exception:
+            pass  # uc 실패 → selenium 폴백
+
+    # ── Selenium 폴백
     opts = Options()
     if headless:
         opts.add_argument("--headless=new")
-    # 안정 옵션
     opts.page_load_strategy = "eager"
     opts.add_argument("--lang=ko_KR")
     opts.add_argument("--disable-gpu")
@@ -91,17 +153,12 @@ def _make_driver(headless: bool = True) -> webdriver.Chrome:
     opts.add_argument("--window-size=1280,1600")
     opts.add_argument("--disable-extensions")
     opts.add_argument("--remote-debugging-port=9222")
-
+    ua = MOBILE_UA if USE_MOBILE_UA else DESKTOP_UA
+    opts.add_argument(f"user-agent={ua}")
     chrome_bin = os.environ.get("GOOGLE_CHROME_BIN") or os.environ.get("CHROME_BIN")
     if chrome_bin:
         opts.binary_location = chrome_bin
-
-    opts.add_argument(
-        "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    )
-
-    driver = webdriver.Chrome(options=opts)  # Selenium Manager 사용
+    driver = webdriver.Chrome(options=opts)
     driver.set_page_load_timeout(30)
     return driver
 
@@ -143,26 +200,24 @@ def generate_s_no_list(
     try:
         driver.get(BASE_URL)
 
-        # 문서 준비(짧게)
+        # DOM 준비 대기 + 약간의 자연스러운 스크롤
         try:
             WebDriverWait(driver, 12).until(
                 lambda d: d.execute_script("return document.readyState") in ("interactive", "complete")
             )
         except Exception:
             pass
+        for _ in range(3):
+            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);"); time.sleep(0.8)
+            driver.execute_script("window.scrollTo(0, 0);"); time.sleep(0.3)
 
         s_nos: List[str] = []
 
-        # (A) 기존 CSS 경로 시도 + 스크롤
+        # (A) 표준 CSS 셀렉터
         try:
-            WebDriverWait(driver, 12).until(
+            WebDriverWait(driver, 15).until(
                 EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div.swiper-slide.item"))
             )
-            for _ in range(2):
-                driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-                time.sleep(0.7)
-            driver.execute_script("window.scrollTo(0, 0);"); time.sleep(0.2)
-
             anchors = driver.find_elements(By.CSS_SELECTOR, "div.swiper-slide.item a[onclick*='s_no=']")
             for a in anchors:
                 onclick = a.get_attribute("onclick") or ""
@@ -172,21 +227,37 @@ def generate_s_no_list(
         except Exception:
             pass
 
-        # (B) 폴백1: 페이지 전체 HTML에서 정규식 추출
+        # (B) 페이지 전체 HTML 정규식
         if not s_nos:
             html = driver.page_source or ""
             s_nos = re.findall(r"s_no=(\d+)", html)
 
-        # (C) 폴백2: requests 로 RAW HTML 가져와 정규식 (헤드리스 차단 대비)
+        # (C) JavaScript로 onclick 전수 조사 (DOM이 바뀐 경우)
+        if not s_nos:
+            try:
+                js = """
+                return Array.from(document.querySelectorAll('a[onclick]'))
+                  .map(a => a.getAttribute('onclick')||'')
+                  .filter(s => /s_no=\\d+/.test(s));
+                """
+                calls = driver.execute_script(js) or []
+                for s in calls:
+                    m = re.search(r"s_no=(\d+)", s)
+                    if m:
+                        s_nos.append(m.group(1))
+            except Exception:
+                pass
+
+        # (D) requests 폴백 (헤드리스 차단 시)
         if not s_nos:
             try:
                 import requests
                 headers = {
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                                  "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36",
+                    "User-Agent": (MOBILE_UA if USE_MOBILE_UA else DESKTOP_UA),
                     "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
+                    "Referer": BASE_URL,
                 }
-                resp = requests.get(BASE_URL, headers=headers, timeout=10)
+                resp = requests.get(BASE_URL, headers=headers, timeout=12)
                 if resp.status_code == 200:
                     s_nos = re.findall(r"s_no=(\d+)", resp.text)
             except Exception:
@@ -411,7 +482,7 @@ def fetch_predictions(
     return [cached_data[s_no] for s_no in s_no_list if s_no in cached_data]
 
 # -----------------------------------------------------------------------------
-# 하이브리드: 목록 + 누락만 상세 보완 (완성본을 predlist에 기록)
+# 하이브리드
 # -----------------------------------------------------------------------------
 
 def fetch_all_predictions_fast(
@@ -473,10 +544,6 @@ def fetch_all_predictions_fast(
         _save_cache(cache)
 
     return merged
-
-# -----------------------------------------------------------------------------
-# CLI 테스트
-# -----------------------------------------------------------------------------
 
 if __name__ == "__main__":
     fast_rows = fetch_all_predictions_fast(
