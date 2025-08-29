@@ -72,11 +72,30 @@ def parse_naver_vote_live(team_name):
 def health():
     return "ok"
 
+# 디버그: s_no 실시간 추출 결과
+@app.route("/debug/snos")
+def debug_snos():
+    try:
+        snos = generate_s_no_list(headless=True, use_cache=False, ttl_minutes=DEFAULT_TTL_MIN, force_refresh=True)
+        return {"s_nos_live": snos}, 200
+    except Exception as e:
+        return {"error": str(e)}, 500
+
+# 디버그: 오늘자 캐시 상태
+@app.route("/debug/cache")
+def debug_cache():
+    cache = _load_cache()
+    day_key = _today_kst_str()
+    return {
+        "keys": list(cache.keys())[:100],
+        "predlist_today": cache.get(f"predlist:{day_key}")
+    }, 200
+
 @app.route("/", methods=["GET", "POST"])
 def index():
     selected_team = request.form.get("team") if request.method == "POST" else teams[0]
 
-    # ▶ 첫 부팅 타임아웃 시 안전 폴백
+    # 첫 부팅 타임아웃 시 안전 폴백
     try:
         s_no_list = generate_s_no_list(headless=True, use_cache=True, ttl_minutes=DEFAULT_TTL_MIN)
     except Exception:
@@ -86,7 +105,6 @@ def index():
         if item and item.get("data"):
             s_no_list = [r.get("s_no") for r in item["data"] if r.get("s_no")]
         else:
-            # predlist도 없으면 화면만 뜨도록
             return render_template(
                 "predict.html",
                 teams=teams,
