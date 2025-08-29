@@ -15,8 +15,6 @@ COPY . /app
 
 ENV PORT=8080
 # ENV REMOTE_CACHE_URL=https://raw.githubusercontent.com/<USER>/<REPO>/<BRANCH>/statiz_cache.json
-# ENV REMOTE_IMAGE_BASE=https://raw.githubusercontent.com/<USER>/<REPO>/<BRANCH>/static/player
-# 또는 jsDelivr: https://cdn.jsdelivr.net/gh/<USER>/<REPO>@<BRANCH>/static/player
 ENV CACHE_TTL_MIN=30
 
 EXPOSE 8080
