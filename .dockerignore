@@ -3,12 +3,11 @@ __pycache__/
 *.pyo
 *.pyd
 *.log
-*.swp
 .venv/
 .env
 .git
 .gitignore
 .DS_Store
+/data/
 statiz_cache.json
 *.tmp
-/data/
