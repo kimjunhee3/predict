@@ -1,11 +1,15 @@
-# predict_back.py
 import os
+import requests
 from flask import Flask, render_template, request
-from statiz_predict import fetch_predictions, generate_s_no_list, DEFAULT_TTL_MIN
 from bs4 import BeautifulSoup
 
-import requests
-from urllib.parse import urljoin
+from statiz_predict import (
+    fetch_predictions,
+    generate_s_no_list,
+    DEFAULT_TTL_MIN,
+    _load_cache,
+    _today_kst_str,
+)
 
 app = Flask(__name__)
 
@@ -27,25 +31,6 @@ team_colors = {
 NAVER_VOTE_URL = "https://m.sports.naver.com/predict?tab=today&groupId=kbaseball&categoryId=kbo"
 USE_NAVER_LIVE = os.environ.get("USE_NAVER_LIVE", "0") == "1"
 
-def parse_naver_vote_from_file(team_name, file_path="fanvote.html"):
-    if not os.path.exists(file_path):
-        return None
-    with open(file_path, "r", encoding="utf-8") as f:
-        soup = BeautifulSoup(f, "html.parser")
-    return _extract_naver_block(soup, team_name)
-
-def parse_naver_vote_live(team_name):
-    # 간단한 라이브 파서(차단 회피용 UA만 지정)
-    headers = {
-        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) "
-                      "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1"
-    }
-    resp = requests.get(NAVER_VOTE_URL, headers=headers, timeout=12)
-    if resp.status_code != 200:
-        return None
-    soup = BeautifulSoup(resp.text, "html.parser")
-    return _extract_naver_block(soup, team_name)
-
 def _extract_naver_block(soup: BeautifulSoup, team_name: str):
     match_boxes = soup.select("div.MatchBox_match_box__IW-0f")
     for box in match_boxes:
@@ -62,23 +47,62 @@ def _extract_naver_block(soup: BeautifulSoup, team_name: str):
                 }
     return None
 
+def parse_naver_vote_from_file(team_name, file_path="fanvote.html"):
+    if not os.path.exists(file_path):
+        return None
+    with open(file_path, "r", encoding="utf-8") as f:
+        soup = BeautifulSoup(f, "html.parser")
+    return _extract_naver_block(soup, team_name)
+
+def parse_naver_vote_live(team_name):
+    headers = {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) "
+                      "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1"
+    }
+    try:
+        resp = requests.get(NAVER_VOTE_URL, headers=headers, timeout=12)
+        if resp.status_code != 200:
+            return None
+        soup = BeautifulSoup(resp.text, "html.parser")
+        return _extract_naver_block(soup, team_name)
+    except Exception:
+        return None
+
+@app.route("/health")
+def health():
+    return "ok"
+
 @app.route("/", methods=["GET", "POST"])
 def index():
-    if request.method == "POST":
-        selected_team = request.form.get("team")
-    else:
-        selected_team = teams[0]
+    selected_team = request.form.get("team") if request.method == "POST" else teams[0]
 
-    # Statiz: s_no 목록 → 상세
-    s_no_list = generate_s_no_list(headless=True, use_cache=True, ttl_minutes=DEFAULT_TTL_MIN)
+    # ▶ 첫 부팅 타임아웃 시 안전 폴백
+    try:
+        s_no_list = generate_s_no_list(headless=True, use_cache=True, ttl_minutes=DEFAULT_TTL_MIN)
+    except Exception:
+        cache = _load_cache()
+        day_key = _today_kst_str()
+        item = cache.get(f"predlist:{day_key}")
+        if item and item.get("data"):
+            s_no_list = [r.get("s_no") for r in item["data"] if r.get("s_no")]
+        else:
+            # predlist도 없으면 화면만 뜨도록
+            return render_template(
+                "predict.html",
+                teams=teams,
+                selected_team=selected_team,
+                statiz=None,
+                naver=None,
+                player_img_map={},
+                team_colors=team_colors,
+            )
+
     statiz_data = fetch_predictions(s_no_list, headless=True, use_cache=True, ttl_minutes=DEFAULT_TTL_MIN)
-
     statiz_match = next(
         (m for m in statiz_data if selected_team in [m.get('left_team'), m.get('right_team')]),
         None
     )
 
-    # NAVER: 라이브/스냅샷 중 택1
     if USE_NAVER_LIVE:
         naver_match = parse_naver_vote_live(selected_team)
     else:
@@ -121,6 +145,5 @@ def index():
     )
 
 if __name__ == '__main__':
-    # 로컬 개발 시만 사용(Gunicorn으로 배포)
     port = int(os.environ.get("PORT", "8080"))
     app.run(host="0.0.0.0", port=port, debug=True)
