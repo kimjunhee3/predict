@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
 """
 원격 JSON(깃허브 raw) → /data/statiz_cache.json 로컬 캐시
-- REMOTE_CACHE_URL을 설정하면 그 URL에서 받아오고 /data에 저장.
-- 실패해도 레포에 번들된 statiz_cache.json(BUNDLED_CACHE_PATH)을 폴백으로 사용.
-- predlist:<YYYY-MM-DD>의 data 배열을 오늘자(없으면 최신)로 꺼내서 사용.
+- REMOTE_CACHE_URL에서 받아오고 /data에 저장
+- 실패 시 레포에 번들된 statiz_cache.json을 폴백
+- predlist:<YYYY-MM-DD>의 data 배열을 오늘자(없으면 최신)로 반환
 """
-
 import os
 import json
 import time
@@ -14,10 +13,9 @@ from typing import Dict, Any, List, Optional
 
 import requests
 
-# 환경변수
-REMOTE_CACHE_URL = os.environ.get("REMOTE_CACHE_URL", "")  # ex) https://raw.githubusercontent.com/<user>/<repo>/<branch>/statiz_cache.json
+REMOTE_CACHE_URL = os.environ.get("REMOTE_CACHE_URL", "")
 CACHE_TTL_MIN = int(os.environ.get("CACHE_TTL_MIN", "30"))
-BUNDLED_CACHE_PATH = os.environ.get("BUNDLED_CACHE_PATH", "statiz_cache.json")  # 레포에 같이 커밋한 파일
+BUNDLED_CACHE_PATH = os.environ.get("BUNDLED_CACHE_PATH", "statiz_cache.json")
 
 def _now_kst() -> datetime:
     return datetime.utcnow().replace(tzinfo=timezone.utc) + timedelta(hours=9)
@@ -64,13 +62,13 @@ def fetch_remote_into_cache(force: bool = False) -> Dict[str, Any]:
     """
     cache_path = _cache_path()
 
-    # 1) 로컬 캐시가 신선하면 우선 사용
+    # 1) 로컬 캐시 신선하면 우선
     if not force and _is_fresh_file(cache_path, CACHE_TTL_MIN):
         data = _load_local_json(cache_path)
         if data:
             return data
 
-    # 2) 원격에서 받아오기
+    # 2) 원격
     if REMOTE_CACHE_URL:
         try:
             r = requests.get(REMOTE_CACHE_URL, timeout=12)
@@ -80,20 +78,16 @@ def fetch_remote_into_cache(force: bool = False) -> Dict[str, Any]:
                 _save_local_json(cache_path, data)
                 return data
         except Exception:
-            pass  # 원격 실패 시 폴백으로
+            pass
 
-    # 3) 레포에 번들된 파일 폴백
+    # 3) 번들 폴백
     bundled = _load_local_json(BUNDLED_CACHE_PATH)
     if bundled:
-        _save_local_json(cache_path, bundled)  # 앞으로는 /data 캐시 사용
+        _save_local_json(cache_path, bundled)
         return bundled
 
-    # 모두 실패
     return {}
 
-# -----------------------------
-# predlist 조회 유틸
-# -----------------------------
 def _pick_latest_predlist_key(cache_json: Dict[str, Any]) -> Optional[str]:
     keys = [k for k in cache_json.keys() if k.startswith("predlist:")]
     if not keys:
@@ -124,7 +118,6 @@ def find_match_for_team(predlist_rows: List[Dict[str, Any]], team: str) -> Optio
             return r
     return None
 
-# 외부에서 쓸 수 있게 export
 __all__ = [
     "fetch_remote_into_cache", "get_today_predlist", "find_match_for_team", "_today_kst_str"
 ]
