@@ -4,8 +4,9 @@ from flask import Flask, render_template, request
 from bs4 import BeautifulSoup
 
 from statiz_predict import (
-    fetch_predictions,
     generate_s_no_list,
+    fetch_predictions,
+    fetch_all_predictions_fast,
     DEFAULT_TTL_MIN,
     _load_cache,
     _today_kst_str,
@@ -72,7 +73,6 @@ def parse_naver_vote_live(team_name):
 def health():
     return "ok"
 
-# 디버그: s_no 실시간 추출 결과
 @app.route("/debug/snos")
 def debug_snos():
     try:
@@ -81,7 +81,6 @@ def debug_snos():
     except Exception as e:
         return {"error": str(e)}, 500
 
-# 디버그: 오늘자 캐시 상태
 @app.route("/debug/cache")
 def debug_cache():
     cache = _load_cache()
@@ -95,31 +94,60 @@ def debug_cache():
 def index():
     selected_team = request.form.get("team") if request.method == "POST" else teams[0]
 
-    # 첫 부팅 타임아웃 시 안전 폴백
+    # 목록 기반으로 먼저 시도 (상세 진입 없이)
     try:
-        s_no_list = generate_s_no_list(headless=True, use_cache=True, ttl_minutes=DEFAULT_TTL_MIN)
+        rows = fetch_all_predictions_fast(
+            headless=True,
+            use_cache=True,
+            ttl_minutes=DEFAULT_TTL_MIN,
+            force_refresh=False,
+            fill_detail=False,
+        )
     except Exception:
-        cache = _load_cache()
-        day_key = _today_kst_str()
-        item = cache.get(f"predlist:{day_key}")
-        if item and item.get("data"):
-            s_no_list = [r.get("s_no") for r in item["data"] if r.get("s_no")]
-        else:
-            return render_template(
-                "predict.html",
-                teams=teams,
-                selected_team=selected_team,
-                statiz=None,
-                naver=None,
-                player_img_map={},
-                team_colors=team_colors,
-            )
+        rows = []
 
-    statiz_data = fetch_predictions(s_no_list, headless=True, use_cache=True, ttl_minutes=DEFAULT_TTL_MIN)
+    # 비어 있으면 강제 새로고침
+    if not rows:
+        try:
+            rows = fetch_all_predictions_fast(
+                headless=True,
+                use_cache=False,
+                ttl_minutes=DEFAULT_TTL_MIN,
+                force_refresh=True,
+                fill_detail=False,
+            )
+        except Exception:
+            rows = []
+
+    # 캐시 폴백
+    if not rows:
+        cache = _load_cache()
+        item = cache.get(f"predlist:{_today_kst_str()}")
+        rows = item["data"] if item and item.get("data") else []
+
+    if not rows:
+        return render_template(
+            "predict.html",
+            teams=teams,
+            selected_team=selected_team,
+            statiz=None,
+            naver=None,
+            player_img_map={},
+            team_colors=team_colors,
+        )
+
     statiz_match = next(
-        (m for m in statiz_data if selected_team in [m.get('left_team'), m.get('right_team')]),
+        (r for r in rows if selected_team in [r.get("left_team"), r.get("right_team")]),
         None
     )
+
+    if statiz_match and (statiz_match.get("left_percent") is None or statiz_match.get("right_percent") is None):
+        try:
+            detailed = fetch_predictions([statiz_match["s_no"]], headless=True, use_cache=True)
+            if detailed:
+                statiz_match = detailed[0]
+        except Exception:
+            pass
 
     if USE_NAVER_LIVE:
         naver_match = parse_naver_vote_live(selected_team)
@@ -139,7 +167,6 @@ def index():
         "삼성": {"투수": "삼성_투수.png", "야수": "삼성_야수.png"}
     }
 
-    # 포맷팅
     if statiz_match and statiz_match.get("left_percent") is not None and statiz_match.get("right_percent") is not None:
         statiz_match["left_percent"] = round(float(statiz_match["left_percent"]), 1)
         statiz_match["right_percent"] = round(float(statiz_match["right_percent"]), 1)
