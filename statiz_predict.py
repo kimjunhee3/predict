@@ -82,7 +82,7 @@ def _make_driver(headless: bool = True) -> webdriver.Chrome:
     opts = Options()
     if headless:
         opts.add_argument("--headless=new")
-    # ▶ 추가 안정 옵션
+    # 안정 옵션
     opts.page_load_strategy = "eager"
     opts.add_argument("--lang=ko_KR")
     opts.add_argument("--disable-gpu")
@@ -121,7 +121,7 @@ def _percent_from_style(style: str) -> Optional[float]:
     return float(m.group(1)) if m else None
 
 # -----------------------------------------------------------------------------
-# s_no 목록 수집 (+재시도/폴백, 캐시)
+# s_no 목록 수집 (+캐시, 다중 폴백)
 # -----------------------------------------------------------------------------
 
 def generate_s_no_list(
@@ -152,52 +152,45 @@ def generate_s_no_list(
             pass
 
         s_nos: List[str] = []
-        errors = []
 
-        # 최대 2회 재시도: CSS → 스크롤 → JS 폴백
-        for _ in range(2):
+        # (A) 기존 CSS 경로 시도 + 스크롤
+        try:
+            WebDriverWait(driver, 12).until(
+                EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div.swiper-slide.item"))
+            )
+            for _ in range(2):
+                driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+                time.sleep(0.7)
+            driver.execute_script("window.scrollTo(0, 0);"); time.sleep(0.2)
+
+            anchors = driver.find_elements(By.CSS_SELECTOR, "div.swiper-slide.item a[onclick*='s_no=']")
+            for a in anchors:
+                onclick = a.get_attribute("onclick") or ""
+                m = re.search(r"s_no=(\d+)", onclick)
+                if m:
+                    s_nos.append(m.group(1))
+        except Exception:
+            pass
+
+        # (B) 폴백1: 페이지 전체 HTML에서 정규식 추출
+        if not s_nos:
+            html = driver.page_source or ""
+            s_nos = re.findall(r"s_no=(\d+)", html)
+
+        # (C) 폴백2: requests 로 RAW HTML 가져와 정규식 (헤드리스 차단 대비)
+        if not s_nos:
             try:
-                WebDriverWait(driver, 15).until(
-                    EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div.swiper-slide.item"))
-                )
-                for _ in range(2):
-                    driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-                    time.sleep(0.8)
-                driver.execute_script("window.scrollTo(0, 0);")
-                time.sleep(0.2)
-
-                slides = driver.find_elements(By.CSS_SELECTOR, "div.swiper-slide.item a[onclick*='s_no=']")
-                if not slides:
-                    raise TimeoutException("no anchors with s_no found in slides")
-
-                for a in slides:
-                    onclick = a.get_attribute("onclick") or ""
-                    m = re.search(r"s_no=(\d+)", onclick)
-                    if m:
-                        s_nos.append(m.group(1))
-                if s_nos:
-                    break
-            except Exception as e:
-                errors.append(str(e))
-
-            # 폴백: 페이지 전체에서 onclick 추출
-            try:
-                anchors = driver.find_elements(By.CSS_SELECTOR, "a[onclick*='s_no=']")
-                if not anchors:
-                    for _ in range(3):
-                        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-                        time.sleep(0.8)
-                    anchors = driver.find_elements(By.CSS_SELECTOR, "a[onclick*='s_no=']")
-
-                for a in anchors:
-                    onclick = a.get_attribute("onclick") or ""
-                    m = re.search(r"s_no=(\d+)", onclick)
-                    if m:
-                        s_nos.append(m.group(1))
-                if s_nos:
-                    break
-            except Exception as e:
-                errors.append(f"fallback-js:{e}")
+                import requests
+                headers = {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                                  "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36",
+                    "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
+                }
+                resp = requests.get(BASE_URL, headers=headers, timeout=10)
+                if resp.status_code == 200:
+                    s_nos = re.findall(r"s_no=(\d+)", resp.text)
+            except Exception:
+                pass
 
         # 중복 제거
         uniq, seen = [], set()
@@ -207,7 +200,7 @@ def generate_s_no_list(
                 uniq.append(s)
 
         if not uniq:
-            raise TimeoutException(f"Failed to collect s_no (errors={errors})")
+            raise TimeoutException("Could not extract s_no from STATIZ")
 
         if use_cache:
             cache[cache_key] = {"ts": _now_kst().isoformat(timespec="seconds"), "data": uniq}
@@ -362,7 +355,6 @@ def scrape_list_page_predictions(
 
         return uniq_rows
     finally:
-        # 반드시 finally로 종료 (이게 빠지면 SyntaxError 유발 지점)
         driver.quit()
 
 # -----------------------------------------------------------------------------
