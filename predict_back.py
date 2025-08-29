@@ -13,9 +13,9 @@ from statiz_reader import (
     _today_kst_str,
 )
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder="templates", static_folder="static")
 
-# CORS: /api/* 만 허용 (필요 시 FRONTEND_ORIGIN=https://your-site 로 제한)
+# React 등 외부에서 /api/* 호출 허용
 FRONTEND_ORIGIN = os.environ.get("FRONTEND_ORIGIN", "*")
 CORS(app, resources={r"/api/*": {"origins": FRONTEND_ORIGIN}})
 
@@ -27,89 +27,81 @@ team_colors = {
     "롯데": "#c9252c", "삼성": "#0d3383"
 }
 
-# NAVER (옵션)
-NAVER_VOTE_URL = "https://m.sports.naver.com/predict?tab=today&groupId=kbaseball&categoryId=kbo"
-USE_NAVER_LIVE = os.environ.get("USE_NAVER_LIVE", "0") == "1"
-ALLOW_NAVER_FALLBACK = os.environ.get("ALLOW_NAVER_FALLBACK", "1") == "1"  # NAVER 없으면 STATIZ 값으로 바 채우기
+# 영문 ↔ 한글 팀명 매핑 (iframe에서 영문이 와도 처리)
+TEAM_EN_TO_KO = {
+    "Samsung": "삼성", "Hanwha": "한화", "Doosan": "두산", "Kiwoom": "키움", "Lotte": "롯데",
+    "SSG": "SSG", "NC": "NC", "KIA": "KIA", "LG": "LG", "KT": "KT",
+    # 한글도 그대로 통과
+    "삼성": "삼성", "한화": "한화", "두산": "두산", "키움": "키움", "롯데": "롯데",
+}
+def to_korean_team(name: str) -> str:
+    if not name:
+        return ""
+    return TEAM_EN_TO_KO.get(str(name).strip(), str(name).strip())
 
-# -------------------------------------
-# 이미지 파일 자동 매칭 유틸
-# -------------------------------------
-TEAM_ALIASES = {
-    "NC": ["NC", "nc", "엔씨"],
-    "SSG": ["SSG", "ssg", "에스에스지"],
-    "LG": ["LG", "lg", "엘지"],
-    "KT": ["KT", "kt"],
-    "KIA": ["KIA", "kia"],
-    "두산": ["두산"],
-    "키움": ["키움"],
-    "한화": ["한화"],
-    "롯데": ["롯데"],
-    "삼성": ["삼성"],
+# ---- 이미지: 로컬 static/player 사용 + NC/SSG 정규화(NFC/NFD) 보정 ----
+PLAYER_IMG_FILES = {
+    "한화": {"투수": "한화_투수.png", "야수": "한화_야수.png"},
+    "LG": {"투수": "엘지_투수.png", "야수": "엘지_야수.png"},
+    "KT": {"투수": "KT_투수.png", "야수": "KT_야수.png"},
+    "두산": {"투수": "두산_투수.png", "야수": "두산_야수.png"},
+    "SSG": {"투수": "SSG_투수.png", "야수": "SSG_야수.png"},
+    "키움": {"투수": "키움_투수.png", "야수": "키움_야수.png"},
+    "KIA": {"투수": "KIA_투수.png", "야수": "KIA_야수.png"},
+    "NC": {"투수": "NC_투수.png", "야수": "NC_야수.png"},
+    "롯데": {"투수": "롯데_투수.png", "야수": "롯데_야수.png"},
+    "삼성": {"투수": "삼성_투수.png", "야수": "삼성_야수.png"},
 }
 
 def _static_player_dir() -> str:
     return os.path.join(app.static_folder, "player")
 
-def _list_player_files() -> list[str]:
-    d = _static_player_dir()
-    if not os.path.isdir(d):
-        return []
-    return [f for f in os.listdir(d) if os.path.isfile(os.path.join(d, f))]
-
-def _nfc_lower(s: str) -> str:
-    # 한글 정규화(NFC) + 소문자
-    return unicodedata.normalize("NFC", s).lower()
-
-def _resolve_player_filename(team: str, role: str) -> str | None:
+def _exists_any_variants(filename: str) -> str | None:
     """
-    static/player 안에서 팀/역할(투수|야수)에 맞는 파일명을 느슨하게 탐색
-    - 대소문자/정규화/언더바·하이픈·실수 공백 허용
+    macOS에서 한글 파일이 NFD로 커밋된 경우를 대비해
+    원문/NFC/NFD 모두 체크해 실제 존재하는 파일명을 반환.
+    (템플릿은 '/static/player/{{ 파일명 }}'로 쓰므로 '파일명'만 돌려준다)
     """
-    files = _list_player_files()
-    if not files:
-        return None
-
-    idx = {_nfc_lower(fn): fn for fn in files}
-    aliases = TEAM_ALIASES.get(team, [team, team.lower(), team.upper()])
-    seps = ["_", "-", "_ ", " -", " _", " - "]
-    exts = [".png", ".PNG", ".jpg", ".jpeg", ".webp"]
-
-    # 1) 정석 조합 우선
-    for name in aliases:
-        for sep in seps:
-            base = f"{name}{sep}{role}"
-            for ext in exts:
-                want = base + ext
-                hit = idx.get(_nfc_lower(want))
-                if hit:
-                    return hit
-
-    # 2) 느슨한 포함 매칭(팀+역할 키워드)
-    want_role = _nfc_lower(role)
-    alias_norms = [_nfc_lower(a) for a in aliases]
-    for fn in files:
-        nfn = _nfc_lower(fn)
-        if any(a in nfn for a in alias_norms) and want_role in nfn and any(nfn.endswith(e.lower()) for e in exts):
-            return idx.get(nfn, fn)
-
+    base = _static_player_dir()
+    # 1) 그대로
+    p0 = os.path.join(base, filename)
+    if os.path.exists(p0):
+        return filename
+    # 2) NFC
+    nfc = unicodedata.normalize("NFC", filename)
+    p1 = os.path.join(base, nfc)
+    if os.path.exists(p1):
+        return nfc
+    # 3) NFD
+    nfd = unicodedata.normalize("NFD", filename)
+    p2 = os.path.join(base, nfd)
+    if os.path.exists(p2):
+        return nfd
     return None
 
 def build_player_img_map() -> dict:
     """
-    템플릿에 넘길 이미지 맵. 못 찾으면 default.png로 폴백.
-    static/player/default.png 파일을 하나 넣어두세요.
+    로컬 /static/player 만 사용.
+    파일이 없거나 정규화 문제면 default.png 폴백.
+    반환값은 {팀: {"투수": "파일명", "야수": "파일명"}} 형태(템플릿과 호환).
     """
     m = {}
     for t in teams:
-        p_pitcher = _resolve_player_filename(t, "투수") or "default.png"
-        p_batter  = _resolve_player_filename(t, "야수") or "default.png"
+        files = PLAYER_IMG_FILES.get(t, {})
+        p_pitcher = files.get("투수", "default.png")
+        p_batter  = files.get("야수", "default.png")
+
+        p_pitcher = _exists_any_variants(p_pitcher) or "default.png"
+        p_batter  = _exists_any_variants(p_batter) or "default.png"
+
         m[t] = {"투수": p_pitcher, "야수": p_batter}
     return m
 
-# -------------------------------------
-# NAVER 파싱
-# -------------------------------------
+# ---- NAVER 투표 (옵션: 로컬 스냅샷 사용) ----
+NAVER_VOTE_URL = "https://m.sports.naver.com/predict?tab=today&groupId=kbaseball&categoryId=kbo"
+USE_NAVER_LIVE = os.environ.get("USE_NAVER_LIVE", "0") == "1"   # 1이면 라이브 요청
+ALLOW_NAVER_FALLBACK = os.environ.get("ALLOW_NAVER_FALLBACK", "1") == "1"
+
 def _extract_naver_block(soup: BeautifulSoup, team_name: str):
     match_boxes = soup.select("div.MatchBox_match_box__IW-0f")
     for box in match_boxes:
@@ -147,59 +139,26 @@ def parse_naver_vote_live(team_name):
     except Exception:
         return None
 
-# -------------------------------------
-# 디버그/헬스
-# -------------------------------------
-@app.route("/health")
-def health():
-    return "ok"
-
-@app.route("/debug/cache")
-def debug_cache():
-    data = fetch_remote_into_cache(force=False)
-    keys = list(data.keys())
-    pred_today = data.get(f"predlist:{_today_kst_str()}")
-    return jsonify({
-        "keys_count": len(keys),
-        "has_today_predlist": bool(pred_today),
-        "today_key": f"predlist:{_today_kst_str()}",
-    })
-
-@app.route("/debug/refresh")
-def debug_refresh():
-    data = fetch_remote_into_cache(force=True)
-    return jsonify({"refreshed": True, "keys_count": len(data.keys())})
-
-@app.route("/debug/player-images")
-def debug_player_images():
-    return jsonify(build_player_img_map())
-
-# -------------------------------------
-# 공통 페이로드 생성
-# -------------------------------------
+# ---- 공통 페이로드 ----
 def build_payload_for_team(team: str) -> dict:
     cache_json = fetch_remote_into_cache(force=False)
     rows = get_today_predlist(cache_json)
     statiz_match = find_match_for_team(rows, team)
 
-    # NAVER (라이브 or 스냅샷)
     if USE_NAVER_LIVE:
         naver_match = parse_naver_vote_live(team)
     else:
         naver_match = parse_naver_vote_from_file(team, "fanvote.html")
 
-    # NAVER 없으면(선택) STATIZ 값으로 대체
     if not naver_match and statiz_match and ALLOW_NAVER_FALLBACK:
         lp = float(statiz_match["left_percent"]) if statiz_match.get("left_percent") is not None else 0.0
         rp = float(statiz_match["right_percent"]) if statiz_match.get("right_percent") is not None else 0.0
         naver_match = {
             "team1": statiz_match.get("left_team") or "",
             "team2": statiz_match.get("right_team") or "",
-            "percent1": lp,
-            "percent2": rp,
+            "percent1": lp, "percent2": rp,
         }
 
-    # 포맷팅
     if statiz_match and statiz_match.get("left_percent") is not None and statiz_match.get("right_percent") is not None:
         statiz_match["left_percent"] = round(float(statiz_match["left_percent"]), 1)
         statiz_match["right_percent"] = round(float(statiz_match["right_percent"]), 1)
@@ -221,14 +180,15 @@ def build_payload_for_team(team: str) -> dict:
         "date_key": f"predlist:{_today_kst_str()}",
     }
 
-# -------------------------------------
-# 페이지 렌더(원래 템플릿 그대로 사용)
-# -------------------------------------
+# ---- 라우트 ----
 @app.route("/", methods=["GET", "POST"])
 def index():
-    selected_team = request.form.get("team") if request.method == "POST" else teams[0]
+    # ✅ GET 쿼리/POST 폼 모두 허용 + 영문 팀명도 한글로 변환
+    raw_team = request.values.get("team") or teams[0]
+    selected_team = to_korean_team(raw_team)
+
     payload = build_payload_for_team(selected_team)
-    player_img_map = build_player_img_map()  # ✅ 자동 매칭/폴백 적용
+    player_img_map = build_player_img_map()  # 파일명만 반환 (템플릿과 호환)
 
     return render_template(
         "predict.html",
@@ -240,21 +200,39 @@ def index():
         team_colors=team_colors
     )
 
-# -------------------------------------
-# JSON API (React 등에서 사용)
-# -------------------------------------
 @app.route("/api/teams")
 def api_teams():
     return jsonify({"teams": teams})
 
 @app.route("/api/predict")
 def api_predict():
-    team = request.args.get("team", teams[0])
+    # 프론트(App.js)에서 팀 바꿔 호출할 때 사용
+    raw_team = request.args.get("team", teams[0])
+    team = to_korean_team(raw_team)
     if team not in teams:
         return jsonify({"error": "unknown team"}), 400
     payload = build_payload_for_team(team)
     payload["player_img_map"] = build_player_img_map()
     return jsonify(payload)
+
+@app.route("/health")
+def health():
+    return "ok"
+
+@app.route("/debug/player-images")
+def debug_player_images():
+    return jsonify(build_player_img_map())
+
+@app.route("/debug/cache")
+def debug_cache():
+    data = fetch_remote_into_cache(force=False)
+    keys = list(data.keys())
+    pred_today = data.get(f"predlist:{_today_kst_str()}")
+    return jsonify({
+        "keys_count": len(keys),
+        "has_today_predlist": bool(pred_today),
+        "today_key": f"predlist:{_today_kst_str()}",
+    })
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "8080"))
