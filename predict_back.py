@@ -11,6 +11,7 @@ from statiz_reader import (
     get_today_predlist,
     find_match_for_team,
     _today_kst_str,
+    get_pred_rows_for_date,   # 디버그용
 )
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
@@ -58,9 +59,8 @@ def _static_player_dir() -> str:
 
 def _exists_any_variants(filename: str) -> str | None:
     """
-    macOS에서 한글 파일이 NFD로 커밋된 경우를 대비해
-    원문/NFC/NFD 모두 체크해 실제 존재하는 파일명을 반환.
-    (템플릿은 '/static/player/{{ 파일명 }}'로 쓰므로 '파일명'만 돌려준다)
+    macOS에서 한글 파일이 NFD로 커밋된 경우 대비
+    원문/NFC/NFD 모두 체크 → 실제 존재하는 파일명을 반환
     """
     base = _static_player_dir()
     # 1) 그대로
@@ -83,7 +83,7 @@ def build_player_img_map() -> dict:
     """
     로컬 /static/player 만 사용.
     파일이 없거나 정규화 문제면 default.png 폴백.
-    반환값은 {팀: {"투수": "파일명", "야수": "파일명"}} 형태(템플릿과 호환).
+    반환값은 {팀: {"투수": "파일명", "야수": "파일명"}} 형태.
     """
     m = {}
     for t in teams:
@@ -111,10 +111,15 @@ def _extract_naver_block(soup: BeautifulSoup, team_name: str):
             t1, t2 = teams_[0].get_text(strip=True), teams_[1].get_text(strip=True)
             p1, p2 = percents[0].get_text(strip=True), percents[1].get_text(strip=True)
             if team_name in [t1, t2]:
+                try:
+                    p1f = float(p1.replace('%','').strip())
+                    p2f = float(p2.replace('%','').strip())
+                except Exception:
+                    continue
                 return {
                     "team1": t1, "team2": t2,
-                    "percent1": float(p1.replace('%','').strip()),
-                    "percent2": float(p2.replace('%','').strip()),
+                    "percent1": p1f,
+                    "percent2": p2f,
                 }
     return None
 
@@ -142,7 +147,7 @@ def parse_naver_vote_live(team_name):
 # ---- 공통 페이로드 ----
 def build_payload_for_team(team: str) -> dict:
     cache_json = fetch_remote_into_cache(force=False)
-    rows = get_today_predlist(cache_json)
+    rows = get_today_predlist(cache_json)  # ← 오늘(KST) 또는 최신 폴백, 'pred:' 포맷 지원
     statiz_match = find_match_for_team(rows, team)
 
     if USE_NAVER_LIVE:
@@ -150,6 +155,7 @@ def build_payload_for_team(team: str) -> dict:
     else:
         naver_match = parse_naver_vote_from_file(team, "fanvote.html")
 
+    # 네이버가 없으면 statiz 비율로 폴백 허용
     if not naver_match and statiz_match and ALLOW_NAVER_FALLBACK:
         lp = float(statiz_match["left_percent"]) if statiz_match.get("left_percent") is not None else 0.0
         rp = float(statiz_match["right_percent"]) if statiz_match.get("right_percent") is not None else 0.0
@@ -159,6 +165,7 @@ def build_payload_for_team(team: str) -> dict:
             "percent1": lp, "percent2": rp,
         }
 
+    # 포맷 정리 (문자열 표시 포함)
     if statiz_match and statiz_match.get("left_percent") is not None and statiz_match.get("right_percent") is not None:
         statiz_match["left_percent"] = round(float(statiz_match["left_percent"]), 1)
         statiz_match["right_percent"] = round(float(statiz_match["right_percent"]), 1)
@@ -177,7 +184,7 @@ def build_payload_for_team(team: str) -> dict:
         "naver": naver_match,
         "team_colors": team_colors,
         "has_data": bool(statiz_match),
-        "date_key": f"predlist:{_today_kst_str()}",
+        "date_key": _today_kst_str(),
     }
 
 # ---- 라우트 ----
@@ -188,7 +195,7 @@ def index():
     selected_team = to_korean_team(raw_team)
 
     payload = build_payload_for_team(selected_team)
-    player_img_map = build_player_img_map()  # 파일명만 반환 (템플릿과 호환)
+    player_img_map = build_player_img_map()  # 파일명만 반환
 
     return render_template(
         "predict.html",
@@ -226,12 +233,16 @@ def debug_player_images():
 @app.route("/debug/cache")
 def debug_cache():
     data = fetch_remote_into_cache(force=False)
-    keys = list(data.keys())
-    pred_today = data.get(f"predlist:{_today_kst_str()}")
+    today = _today_kst_str()
+    today_rows = get_pred_rows_for_date(data, today)
+    # 사용 가능한 날짜 나열 (최신 포맷/구포맷 모두)
+    dates = sorted({k.split(":")[1] for k in data.keys() if k.startswith(("pred:", "predlist:", "s_nos:"))})
     return jsonify({
-        "keys_count": len(keys),
-        "has_today_predlist": bool(pred_today),
-        "today_key": f"predlist:{_today_kst_str()}",
+        "available_dates": dates,
+        "today": today,
+        "today_rows_count": len(today_rows),
+        "has_today": bool(today_rows),
+        "note": "pred:YYYY-MM-DD[:s_no] 우선, 없으면 predlist:YYYY-MM-DD 폴백",
     })
 
 if __name__ == "__main__":
