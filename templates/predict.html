@@ -171,12 +171,12 @@
                     <div class="bar-label">STATIZ</div>
                     <div class="bar-dynamic">
                         <a class="bar-link" href="https://statiz.sporki.com/prediction/" target="_blank" style="width: {{ statiz.left_percent }}%;">
-                            <div class="bar-left" style="width:100%; background-color: {% if statiz.left_percent > statiz.right_percent %}{{ team_colors[statiz.left_team] }}{% else %}#fff{% endif %}; color: {% if statiz.left_percent > statiz.right_percent %}#fff{% else %}#23283a{% endif %};">
+                            <div class="bar-left" style="width:100%; background-color: {% if statiz.left_percent >= statiz.right_percent %}{{ team_colors[statiz.left_team] }}{% else %}#fff{% endif %}; color: {% if statiz.left_percent >= statiz.right_percent %}#fff{% else %}#23283a{% endif %};">
                                 {{ statiz.left_percent_str }}
                             </div>
                         </a>
                         <a class="bar-link" href="https://statiz.sporki.com/prediction/" target="_blank" style="width: {{ statiz.right_percent }}%;">
-                            <div class="bar-right" style="width:100%; background-color: {% if statiz.right_percent > statiz.left_percent %}{{ team_colors[statiz.right_team] }}{% else %}#fff{% endif %}; color: {% if statiz.right_percent > statiz.left_percent %}#fff{% else %}#23283a{% endif %};">
+                            <div class="bar-right" style="width:100%; background-color: {% if statiz.right_percent >= statiz.left_percent %}{{ team_colors[statiz.right_team] }}{% else %}#fff{% endif %}; color: {% if statiz.right_percent >= statiz.left_percent %}#fff{% else %}#23283a{% endif %};">
                                 {{ statiz.right_percent_str }}
                             </div>
                         </a>
@@ -186,12 +186,12 @@
                     <div class="bar-label">NAVER</div>
                     <div class="bar-dynamic">
                         <a class="bar-link" href="https://m.sports.naver.com/predict?tab=today&groupId=kbaseball&categoryId=kbo" target="_blank" style="width: {{ naver.percent1 }}%;">
-                            <div class="bar-left" style="width:100%; background-color: {% if naver.percent1 > naver.percent2 %}{{ team_colors[statiz.left_team] }}{% else %}#fff{% endif %}; color: {% if naver.percent1 > naver.percent2 %}#fff{% else %}#23283a{% endif %};">
+                            <div class="bar-left" style="width:100%; background-color: {% if naver.percent1 >= naver.percent2 %}{{ team_colors[statiz.left_team] }}{% else %}#fff{% endif %}; color: {% if naver.percent1 >= naver.percent2 %}#fff{% else %}#23283a{% endif %};">
                                 {{ naver.percent1_str }}
                             </div>
                         </a>
                         <a class="bar-link" href="https://m.sports.naver.com/predict?tab=today&groupId=kbaseball&categoryId=kbo" target="_blank" style="width: {{ naver.percent2 }}%;">
-                            <div class="bar-right" style="width:100%; background-color: {% if naver.percent2 > naver.percent1 %}{{ team_colors[statiz.right_team] }}{% else %}#fff{% endif %}; color: {% if naver.percent2 > naver.percent1 %}#fff{% else %}#23283a{% endif %};">
+                            <div class="bar-right" style="width:100%; background-color: {% if naver.percent2 >= naver.percent1 %}{{ team_colors[statiz.right_team] }}{% else %}#fff{% endif %}; color: {% if naver.percent2 >= naver.percent1 %}#fff{% else %}#23283a{% endif %};">
                                 {{ naver.percent2_str }}
                             </div>
                         </a>
