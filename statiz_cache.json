@@ -1,0 +1,535 @@
+{
+  "pred:2025-08-29:20250661": {
+    "ts": "2025-08-29T03:27:42+00:00",
+    "data": {
+      "s_no": "20250661",
+      "url": "https://statiz.sporki.com/prediction/?s_no=20250661",
+      "left_team": "키움",
+      "right_team": "LG",
+      "left_percent": 28.9,
+      "right_percent": 71.1,
+      "predict_text": null
+    }
+  },
+  "pred:2025-08-29:20250662": {
+    "ts": "2025-08-29T03:27:43+00:00",
+    "data": {
+      "s_no": "20250662",
+      "url": "https://statiz.sporki.com/prediction/?s_no=20250662",
+      "left_team": "NC",
+      "right_team": "SSG",
+      "left_percent": 26.6,
+      "right_percent": 73.4,
+      "predict_text": null
+    }
+  },
+  "pred:2025-08-29:20250663": {
+    "ts": "2025-08-29T03:27:44+00:00",
+    "data": {
+      "s_no": "20250663",
+      "url": "https://statiz.sporki.com/prediction/?s_no=20250663",
+      "left_team": "두산",
+      "right_team": "롯데",
+      "left_percent": 62.3,
+      "right_percent": 37.7,
+      "predict_text": null
+    }
+  },
+  "pred:2025-08-29:20250664": {
+    "ts": "2025-08-29T03:27:46+00:00",
+    "data": {
+      "s_no": "20250664",
+      "url": "https://statiz.sporki.com/prediction/?s_no=20250664",
+      "left_team": "KIA",
+      "right_team": "KT",
+      "left_percent": 53.1,
+      "right_percent": 46.9,
+      "predict_text": null
+    }
+  },
+  "pred:2025-08-29:20250665": {
+    "ts": "2025-08-29T03:27:49+00:00",
+    "data": {
+      "s_no": "20250665",
+      "url": "https://statiz.sporki.com/prediction/?s_no=20250665",
+      "left_team": "삼성",
+      "right_team": "한화",
+      "left_percent": 42.7,
+      "right_percent": 57.3,
+      "predict_text": null
+    }
+  },
+  "predlist:2025-08-29": {
+    "ts": "2025-08-29T03:27:52+00:00",
+    "data": [
+      {
+        "s_no": "20250661",
+        "url": "https://statiz.sporki.com/prediction/?s_no=20250661",
+        "left_team": "키움",
+        "right_team": "LG",
+        "left_percent": 28.9,
+        "right_percent": 71.1,
+        "predict_text": null
+      },
+      {
+        "s_no": "20250662",
+        "url": "https://statiz.sporki.com/prediction/?s_no=20250662",
+        "left_team": "NC",
+        "right_team": "SSG",
+        "left_percent": 26.6,
+        "right_percent": 73.4,
+        "predict_text": null
+      },
+      {
+        "s_no": "20250663",
+        "url": "https://statiz.sporki.com/prediction/?s_no=20250663",
+        "left_team": "두산",
+        "right_team": "롯데",
+        "left_percent": 62.3,
+        "right_percent": 37.7,
+        "predict_text": null
+      },
+      {
+        "s_no": "20250664",
+        "url": "https://statiz.sporki.com/prediction/?s_no=20250664",
+        "left_team": "KIA",
+        "right_team": "KT",
+        "left_percent": 53.1,
+        "right_percent": 46.9,
+        "predict_text": null
+      },
+      {
+        "s_no": "20250665",
+        "url": "https://statiz.sporki.com/prediction/?s_no=20250665",
+        "left_team": "삼성",
+        "right_team": "한화",
+        "left_percent": 42.7,
+        "right_percent": 57.3,
+        "predict_text": null
+      }
+    ]
+  },
+  "pred:2025-08-30:20250666": {
+    "ts": "2025-08-30T11:23:38+00:00",
+    "data": {
+      "s_no": "20250666",
+      "url": "https://statiz.sporki.com/prediction/?s_no=20250666",
+      "left_team": "키움",
+      "right_team": "LG",
+      "left_percent": 26.7,
+      "right_percent": 73.3,
+      "predict_text": "선발 톨허스트는 3경기 연속 승리를 기록한 만큼 좋은 피칭을 보여주고 있고, 타선에서는 지난 29일 3안타를 기록한 문성주의 활약이 예상된다."
+    }
+  },
+  "pred:2025-08-30:20250667": {
+    "ts": "2025-08-30T11:23:42+00:00",
+    "data": {
+      "s_no": "20250667",
+      "url": "https://statiz.sporki.com/prediction/?s_no=20250667",
+      "left_team": "NC",
+      "right_team": "SSG",
+      "left_percent": 46.5,
+      "right_percent": 53.5,
+      "predict_text": "SSG 최정은 직전 경기에서 2홈런 5타점으로 맹활약했다. 또한, 노경은이 8월 ERA 0.84 WHIP 1.03으로 좋은 모습을 보였다는 점에서 SSG의 우세가 예상된다."
+    }
+  },
+  "pred:2025-08-30:20250668": {
+    "ts": "2025-08-30T11:23:46+00:00",
+    "data": {
+      "s_no": "20250668",
+      "url": "https://statiz.sporki.com/prediction/?s_no=20250668",
+      "left_team": "두산",
+      "right_team": "롯데",
+      "left_percent": 54.8,
+      "right_percent": 45.2,
+      "predict_text": "지난 경기 KT전에서 6.1이닝 9탈삼진으로 부활에 성공한 콜어빈이 팀 3연승에 보탬이 되고자 한다. 어제도 롯데를 상대로 7득점에 성공한 팀 타선은 상승세를 타고 포스트시즌 진출의 희망을 놓지 않고 있다."
+    }
+  },
+  "pred:2025-08-30:20250669": {
+    "ts": "2025-08-30T11:23:52+00:00",
+    "data": {
+      "s_no": "20250669",
+      "url": "https://statiz.sporki.com/prediction/?s_no=20250669",
+      "left_team": "KIA",
+      "right_team": "KT",
+      "left_percent": 67.1,
+      "right_percent": 32.9,
+      "predict_text": "KIA 올러는 이번 시즌 KT를 상대로 선발 등판해 ERA 2.12의 좋은 성적을 기록했다. 타선에서는 김호령이 전날 3안타 5타점으로 활약했던 만큼 이 둘의 활약을 바탕으로 KIA의 승리가 예상된다."
+    }
+  },
+  "pred:2025-08-30:20250670": {
+    "ts": "2025-08-30T11:24:03+00:00",
+    "data": {
+      "s_no": "20250670",
+      "url": "https://statiz.sporki.com/prediction/?s_no=20250670",
+      "left_team": "삼성",
+      "right_team": "한화",
+      "left_percent": 44.9,
+      "right_percent": 55.1,
+      "predict_text": "최근 5경기 와이스는 5경기 3승 ERA 2.03을 기록하며 안정적인 투구를 보였고, 최재훈은 0.353의 타율과 4타점으로 강한 모습을 보여 한화의 우세가 예상된다."
+    }
+  },
+  "predlist:2025-08-30": {
+    "ts": "2025-08-30T11:24:13+00:00",
+    "data": [
+      {
+        "s_no": "20250666",
+        "url": "https://statiz.sporki.com/prediction/?s_no=20250666",
+        "left_team": "키움",
+        "right_team": "LG",
+        "left_percent": 26.7,
+        "right_percent": 73.3,
+        "predict_text": "선발 톨허스트는 3경기 연속 승리를 기록한 만큼 좋은 피칭을 보여주고 있고, 타선에서는 지난 29일 3안타를 기록한 문성주의 활약이 예상된다."
+      },
+      {
+        "s_no": "20250667",
+        "url": "https://statiz.sporki.com/prediction/?s_no=20250667",
+        "left_team": "NC",
+        "right_team": "SSG",
+        "left_percent": 46.5,
+        "right_percent": 53.5,
+        "predict_text": "SSG 최정은 직전 경기에서 2홈런 5타점으로 맹활약했다. 또한, 노경은이 8월 ERA 0.84 WHIP 1.03으로 좋은 모습을 보였다는 점에서 SSG의 우세가 예상된다."
+      },
+      {
+        "s_no": "20250668",
+        "url": "https://statiz.sporki.com/prediction/?s_no=20250668",
+        "left_team": "두산",
+        "right_team": "롯데",
+        "left_percent": 54.8,
+        "right_percent": 45.2,
+        "predict_text": "지난 경기 KT전에서 6.1이닝 9탈삼진으로 부활에 성공한 콜어빈이 팀 3연승에 보탬이 되고자 한다. 어제도 롯데를 상대로 7득점에 성공한 팀 타선은 상승세를 타고 포스트시즌 진출의 희망을 놓지 않고 있다."
+      },
+      {
+        "s_no": "20250669",
+        "url": "https://statiz.sporki.com/prediction/?s_no=20250669",
+        "left_team": "KIA",
+        "right_team": "KT",
+        "left_percent": 67.1,
+        "right_percent": 32.9,
+        "predict_text": "KIA 올러는 이번 시즌 KT를 상대로 선발 등판해 ERA 2.12의 좋은 성적을 기록했다. 타선에서는 김호령이 전날 3안타 5타점으로 활약했던 만큼 이 둘의 활약을 바탕으로 KIA의 승리가 예상된다."
+      },
+      {
+        "s_no": "20250670",
+        "url": "https://statiz.sporki.com/prediction/?s_no=20250670",
+        "left_team": "삼성",
+        "right_team": "한화",
+        "left_percent": 44.9,
+        "right_percent": 55.1,
+        "predict_text": "최근 5경기 와이스는 5경기 3승 ERA 2.03을 기록하며 안정적인 투구를 보였고, 최재훈은 0.353의 타율과 4타점으로 강한 모습을 보여 한화의 우세가 예상된다."
+      }
+    ]
+  },
+  "s_nos:2025-09-02": {
+    "ts": "2025-09-02T13:25:09+00:00",
+    "data": [
+      "20250859",
+      "20250860",
+      "20250861",
+      "20250862"
+    ]
+  },
+  "pred:2025-09-02:20250859": {
+    "ts": "2025-09-02T13:25:23+00:00",
+    "data": {
+      "s_no": "20250859",
+      "url": "https://statiz.sporki.com/prediction/?s_no=20250859",
+      "left_team": "롯데",
+      "right_team": "LG",
+      "left_percent": 40.5,
+      "right_percent": 59.5,
+      "predict_text": null
+    }
+  },
+  "pred:2025-09-02:20250860": {
+    "ts": "2025-09-02T13:25:25+00:00",
+    "data": {
+      "s_no": "20250860",
+      "url": "https://statiz.sporki.com/prediction/?s_no=20250860",
+      "left_team": "키움",
+      "right_team": "SSG",
+      "left_percent": 40.5,
+      "right_percent": 59.5,
+      "predict_text": null
+    }
+  },
+  "pred:2025-09-02:20250861": {
+    "ts": "2025-09-02T13:25:26+00:00",
+    "data": {
+      "s_no": "20250861",
+      "url": "https://statiz.sporki.com/prediction/?s_no=20250861",
+      "left_team": "NC",
+      "right_team": "KT",
+      "left_percent": 38.8,
+      "right_percent": 61.2,
+      "predict_text": null
+    }
+  },
+  "pred:2025-09-02:20250862": {
+    "ts": "2025-09-02T13:25:28+00:00",
+    "data": {
+      "s_no": "20250862",
+      "url": "https://statiz.sporki.com/prediction/?s_no=20250862",
+      "left_team": "KIA",
+      "right_team": "한화",
+      "left_percent": 40.5,
+      "right_percent": 59.5,
+      "predict_text": null
+    }
+  },
+  "s_nos:2025-09-03": {
+    "ts": "2025-09-03T15:22:50+00:00",
+    "data": [
+      "20250863",
+      "20250864",
+      "20250865",
+      "20250866"
+    ]
+  },
+  "pred:2025-09-03:20250863": {
+    "ts": "2025-09-03T15:23:08+00:00",
+    "data": {
+      "s_no": "20250863",
+      "url": "https://statiz.sporki.com/prediction/?s_no=20250863",
+      "left_team": "롯데",
+      "right_team": "KT",
+      "left_percent": 54.4,
+      "right_percent": 45.6,
+      "predict_text": "팀의 포스트시즌 진출 사활이 걸려있는 롯데는 에이스 감보아가 선발 마운드에 오른다. 올 시즌 감보아는 지난 경기에서 KT전 6이닝 무실점으로 제몫을 다 했지만 승리투수가 되진 못했다. 올 시즌 헤이수스에게 강했던 유강남, 김민성 등 베테랑들의 활약이 필요할 것이다."
+    }
+  },
+  "pred:2025-09-03:20250864": {
+    "ts": "2025-09-03T15:23:11+00:00",
+    "data": {
+      "s_no": "20250864",
+      "url": "https://statiz.sporki.com/prediction/?s_no=20250864",
+      "left_team": "NC",
+      "right_team": "한화",
+      "left_percent": 38.6,
+      "right_percent": 61.4,
+      "predict_text": "한화 선발 폰세는 올 시즌 NC 상대 2경기 1승 ERA 1.50을 기록했다. 또한 문현빈이 NC 상대 타율 0.436, OPS 1.150으로 강했기 때문에 한화가 유리할 것으로 보인다."
+    }
+  },
+  "pred:2025-09-03:20250865": {
+    "ts": "2025-09-03T15:23:15+00:00",
+    "data": {
+      "s_no": "20250865",
+      "url": "https://statiz.sporki.com/prediction/?s_no=20250865",
+      "left_team": "키움",
+      "right_team": "삼성",
+      "left_percent": 29.6,
+      "right_percent": 70.4,
+      "predict_text": "삼성 선발 가라비토는 이번 시즌 10경기에 등판해 ERA 2.28, WHIP 1.07의 좋은 성적을 기록 중이다. 타선에서는 구자욱이 키움을 상대로 3할 타율, 12타점으로 강했던 만큼 삼성의 승리가 예상된다."
+    }
+  },
+  "pred:2025-09-03:20250866": {
+    "ts": "2025-09-03T15:23:23+00:00",
+    "data": {
+      "s_no": "20250866",
+      "url": "https://statiz.sporki.com/prediction/?s_no=20250866",
+      "left_team": "SSG",
+      "right_team": "KIA",
+      "left_percent": 35.1,
+      "right_percent": 64.9,
+      "predict_text": "선발 네일은 6월 22일 SSG 상대 6.1이닝 3실점 QS 피칭을 기록했고, 직전 등판인 KT전에서 7이닝 1실점 호투를 보여줬다. 타선에서는 SSG 상대 타율 0.340으로 강한 박찬호의 활약이 예상된다."
+    }
+  },
+  "pred:2025-09-09:20250882": {
+    "ts": "2025-09-09T15:38:56+00:00",
+    "data": {
+      "s_no": "20250882",
+      "url": "https://statiz.sporki.com/prediction/?s_no=20250882",
+      "left_team": "LG",
+      "right_team": "키움",
+      "left_percent": 61.6,
+      "right_percent": 38.4,
+      "predict_text": "올 시즌 LG는 키움 상대 9승 6패로 앞서있다. 또한 문보경이 키움 상대 타율 0.370, 박동원이 키움 상대로 3홈런을 기록했기 때문에 LG가 유리할 것으로 보인다."
+    }
+  },
+  "pred:2025-09-09:20250883": {
+    "ts": "2025-09-09T15:39:03+00:00",
+    "data": {
+      "s_no": "20250883",
+      "url": "https://statiz.sporki.com/prediction/?s_no=20250883",
+      "left_team": "두산",
+      "right_team": "KT",
+      "left_percent": 40.3,
+      "right_percent": 59.7,
+      "predict_text": "KT 선발 소형준은 통산 두산 상대 10승 2패 ERA 1.95로 강한 모습이다. 또한 스티븐슨이 두산 상대 14타수 6안타로 강하기 때문에 KT가 유리할 것으로 보인다."
+    }
+  },
+  "pred:2025-09-09:20250884": {
+    "ts": "2025-09-09T15:39:09+00:00",
+    "data": {
+      "s_no": "20250884",
+      "url": "https://statiz.sporki.com/prediction/?s_no=20250884",
+      "left_team": "삼성",
+      "right_team": "KIA",
+      "left_percent": 50.0,
+      "right_percent": 50.0,
+      "predict_text": "KIA는 에이스 네일이 선발 마운드에 오른다. 네일은 올 시즌 삼성전 4경기에 나와 2승 1패 ERA 1.69로 강한 모습을 보였지만 올 시즌 삼성의 팀 타선이 KIA보다 좋은 모습을 보여주고 있어 박빙의 경기가 예상된다."
+    }
+  },
+  "pred:2025-09-09:20250885": {
+    "ts": "2025-09-09T15:39:13+00:00",
+    "data": {
+      "s_no": "20250885",
+      "url": "https://statiz.sporki.com/prediction/?s_no=20250885",
+      "left_team": "한화",
+      "right_team": "롯데",
+      "left_percent": 59.9,
+      "right_percent": 40.1,
+      "predict_text": "한화 선발 와이스는 이번 시즌 롯데를 상대로 4경기 4승 ERA 1.29를 기록하며 극강의 모습을 보이고 있다. 또한, 노시환이 최근 10경기에서 타율 0.382 OPS 1.288을 기록하며 맹활약 중이라는 점에서 한화의 우세가 예상된다."
+    }
+  },
+  "pred:2025-09-09:20250886": {
+    "ts": "2025-09-09T15:39:20+00:00",
+    "data": {
+      "s_no": "20250886",
+      "url": "https://statiz.sporki.com/prediction/?s_no=20250886",
+      "left_team": "SSG",
+      "right_team": "NC",
+      "left_percent": 62.9,
+      "right_percent": 37.1,
+      "predict_text": "SSG 선발 앤더슨은 올 시즌 NC 상대 3경기 2승 19이닝 무실점으로 좋았다. 또한 최정이 NC 상대 8홈런으로 좋았기 때문에 SSG가 유리할 것으로 보인다."
+    }
+  },
+  "predlist:2025-09-09": {
+    "ts": "2025-09-09T15:39:26+00:00",
+    "data": [
+      {
+        "s_no": "20250882",
+        "url": "https://statiz.sporki.com/prediction/?s_no=20250882",
+        "left_team": "LG",
+        "right_team": "키움",
+        "left_percent": 61.6,
+        "right_percent": 38.4,
+        "predict_text": "올 시즌 LG는 키움 상대 9승 6패로 앞서있다. 또한 문보경이 키움 상대 타율 0.370, 박동원이 키움 상대로 3홈런을 기록했기 때문에 LG가 유리할 것으로 보인다."
+      },
+      {
+        "s_no": "20250883",
+        "url": "https://statiz.sporki.com/prediction/?s_no=20250883",
+        "left_team": "두산",
+        "right_team": "KT",
+        "left_percent": 40.3,
+        "right_percent": 59.7,
+        "predict_text": "KT 선발 소형준은 통산 두산 상대 10승 2패 ERA 1.95로 강한 모습이다. 또한 스티븐슨이 두산 상대 14타수 6안타로 강하기 때문에 KT가 유리할 것으로 보인다."
+      },
+      {
+        "s_no": "20250884",
+        "url": "https://statiz.sporki.com/prediction/?s_no=20250884",
+        "left_team": "삼성",
+        "right_team": "KIA",
+        "left_percent": 50.0,
+        "right_percent": 50.0,
+        "predict_text": "KIA는 에이스 네일이 선발 마운드에 오른다. 네일은 올 시즌 삼성전 4경기에 나와 2승 1패 ERA 1.69로 강한 모습을 보였지만 올 시즌 삼성의 팀 타선이 KIA보다 좋은 모습을 보여주고 있어 박빙의 경기가 예상된다."
+      },
+      {
+        "s_no": "20250885",
+        "url": "https://statiz.sporki.com/prediction/?s_no=20250885",
+        "left_team": "한화",
+        "right_team": "롯데",
+        "left_percent": 59.9,
+        "right_percent": 40.1,
+        "predict_text": "한화 선발 와이스는 이번 시즌 롯데를 상대로 4경기 4승 ERA 1.29를 기록하며 극강의 모습을 보이고 있다. 또한, 노시환이 최근 10경기에서 타율 0.382 OPS 1.288을 기록하며 맹활약 중이라는 점에서 한화의 우세가 예상된다."
+      },
+      {
+        "s_no": "20250886",
+        "url": "https://statiz.sporki.com/prediction/?s_no=20250886",
+        "left_team": "SSG",
+        "right_team": "NC",
+        "left_percent": 62.9,
+        "right_percent": 37.1,
+        "predict_text": "SSG 선발 앤더슨은 올 시즌 NC 상대 3경기 2승 19이닝 무실점으로 좋았다. 또한 최정이 NC 상대 8홈런으로 좋았기 때문에 SSG가 유리할 것으로 보인다."
+      }
+    ]
+  },
+  "pred:2025-09-10:20250887": {
+    "ts": "2025-09-10T15:53:48+00:00",
+    "data": {
+      "s_no": "20250887",
+      "url": "https://statiz.sporki.com/prediction/?s_no=20250887",
+      "left_team": "삼성",
+      "right_team": "KIA",
+      "left_percent": 50.0,
+      "right_percent": 50.0,
+      "predict_text": "KIA는 에이스 네일이 선발 마운드에 오른다. 네일은 올 시즌 삼성전 4경기에 나와 2승 1패 ERA 1.69로 강한 모습을 보였지만 올 시즌 삼성의 팀 타선이 KIA보다 좋은 모습을 보여주고 있어 박빙의 경기가 예상된다."
+    }
+  },
+  "pred:2025-09-10:20250888": {
+    "ts": "2025-09-10T15:53:53+00:00",
+    "data": {
+      "s_no": "20250888",
+      "url": "https://statiz.sporki.com/prediction/?s_no=20250888",
+      "left_team": "한화",
+      "right_team": "롯데",
+      "left_percent": 52.4,
+      "right_percent": 47.6,
+      "predict_text": "한화 선발 류현진은 직전 등판에서 6이닝 2실점 승리투수를 기록하며 좋은 모습을 보였다. 또한, 리베라토가 롯데를 상대로 타율 0.333 OPS 1.044를 기록하며 맹활약했다는 점에서 한화의 우세가 예상된다."
+    }
+  },
+  "pred:2025-09-10:20250889": {
+    "ts": "2025-09-10T15:53:57+00:00",
+    "data": {
+      "s_no": "20250889",
+      "url": "https://statiz.sporki.com/prediction/?s_no=20250889",
+      "left_team": "SSG",
+      "right_team": "NC",
+      "left_percent": 62.9,
+      "right_percent": 37.1,
+      "predict_text": "앤더슨은 NC 상대 3경기 2승 무실점을 기록하며 압도적인 모습을 보였고, 류효승은 0.545의 타율과 2타점으로 강한 모습을 보여 SSG의 우세가 예상된다."
+    }
+  },
+  "pred:2025-09-10:20250970": {
+    "ts": "2025-09-10T15:54:01+00:00",
+    "data": {
+      "s_no": "20250970",
+      "url": "https://statiz.sporki.com/prediction/?s_no=20250970",
+      "left_team": "LG",
+      "right_team": "두산",
+      "left_percent": 57.6,
+      "right_percent": 42.4,
+      "predict_text": "후반기 손주영은 8경기 선발로 나와 2승 ERA 2.14로 좋은 모습을 보이고 있으며 올 시즌 LG 타선은 팀 타율 1위, 팀 OPS 1위를 할 정도로 좋은 타격능력을 보여주고 있다."
+    }
+  },
+  "predlist:2025-09-10": {
+    "ts": "2025-09-10T15:54:05+00:00",
+    "data": [
+      {
+        "s_no": "20250887",
+        "url": "https://statiz.sporki.com/prediction/?s_no=20250887",
+        "left_team": "삼성",
+        "right_team": "KIA",
+        "left_percent": 50.0,
+        "right_percent": 50.0,
+        "predict_text": "KIA는 에이스 네일이 선발 마운드에 오른다. 네일은 올 시즌 삼성전 4경기에 나와 2승 1패 ERA 1.69로 강한 모습을 보였지만 올 시즌 삼성의 팀 타선이 KIA보다 좋은 모습을 보여주고 있어 박빙의 경기가 예상된다."
+      },
+      {
+        "s_no": "20250888",
+        "url": "https://statiz.sporki.com/prediction/?s_no=20250888",
+        "left_team": "한화",
+        "right_team": "롯데",
+        "left_percent": 52.4,
+        "right_percent": 47.6,
+        "predict_text": "한화 선발 류현진은 직전 등판에서 6이닝 2실점 승리투수를 기록하며 좋은 모습을 보였다. 또한, 리베라토가 롯데를 상대로 타율 0.333 OPS 1.044를 기록하며 맹활약했다는 점에서 한화의 우세가 예상된다."
+      },
+      {
+        "s_no": "20250889",
+        "url": "https://statiz.sporki.com/prediction/?s_no=20250889",
+        "left_team": "SSG",
+        "right_team": "NC",
+        "left_percent": 62.9,
+        "right_percent": 37.1,
+        "predict_text": "앤더슨은 NC 상대 3경기 2승 무실점을 기록하며 압도적인 모습을 보였고, 류효승은 0.545의 타율과 2타점으로 강한 모습을 보여 SSG의 우세가 예상된다."
+      },
+      {
+        "s_no": "20250970",
+        "url": "https://statiz.sporki.com/prediction/?s_no=20250970",
+        "left_team": "LG",
+        "right_team": "두산",
+        "left_percent": 57.6,
+        "right_percent": 42.4,
+        "predict_text": "후반기 손주영은 8경기 선발로 나와 2승 ERA 2.14로 좋은 모습을 보이고 있으며 올 시즌 LG 타선은 팀 타율 1위, 팀 OPS 1위를 할 정도로 좋은 타격능력을 보여주고 있다."
+      }
+    ]
+  }
+}
